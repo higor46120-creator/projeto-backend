@@ -17,24 +17,25 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 
 @Configuration
 @EnableWebSecurity
-@EnableMethodSecurity // Enforced from Spring Boot 3+ / Spring Security 6+
-
+@EnableMethodSecurity
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthFilter;
     private final AuthenticationProvider authenticationProvider;
+    private final OAuth2SuccessHandler oAuth2SuccessHandler;
 
-    public SecurityConfig(JwtAuthenticationFilter jwtAuthFilter, AuthenticationProvider authenticationProvider) {
+    public SecurityConfig(JwtAuthenticationFilter jwtAuthFilter, AuthenticationProvider authenticationProvider, OAuth2SuccessHandler oAuth2SuccessHandler) {
         this.jwtAuthFilter = jwtAuthFilter;
         this.authenticationProvider = authenticationProvider;
+        this.oAuth2SuccessHandler = oAuth2SuccessHandler;
     }
 
-    // Lista de rotas públicas (não exigem autenticação)
     private static final String[] PUBLIC_MATCHERS = {
-            // Autenticação
             "/api/v1/auth/**",
 
-            // Spring OpenAPI / Swagger UI
+            "/oauth2/**",
+            "/login/oauth2/**",
+
             "/v3/api-docs/**",
             "/v3/api-docs.yaml",
             "/swagger-ui/**",
@@ -46,31 +47,26 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-                // Desabilita CSRF (recomendado para APIs REST Stateless)
                 .csrf(AbstractHttpConfigurer::disable)
 
-                // Gerenciamento de sessão Stateless para REST + JWT
                 .sessionManagement(session ->
                         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
                 )
 
-                // Regras de autorização das rotas
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers(PUBLIC_MATCHERS).permitAll() // Libera rotas públicas
-                        .anyRequest().authenticated()                 // Exige autenticação nas demais rotas
+                        .requestMatchers(PUBLIC_MATCHERS).permitAll()
+                        .anyRequest().authenticated()
                 )
 
-                // Provedor de Autenticação (DaoAuthenticationProvider registrado no ApplicationConfig)
                 .authenticationProvider(authenticationProvider)
 
+                .oauth2Login(oauth2 -> oauth2
+                        .successHandler(oAuth2SuccessHandler)
+                )
 
-
-                // Filtro JWT executado antes do filtro padrão de usuário/senha
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
-
 
         return http.build();
     }
-
 
 }
