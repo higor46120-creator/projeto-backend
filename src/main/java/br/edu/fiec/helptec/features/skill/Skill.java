@@ -1,27 +1,22 @@
-package br.edu.fiec.helptec.features.salas;
+package br.edu.fiec.helptec.features.skill;
 
-import br.edu.fiec.helptec.features.commons.AuditBaseEntity;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
-import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-
-
-
-@Data
-@Builder
+// Catálogo de skills existentes (ex: REDE, HARDWARE, SOFTWARE, IMPRESSORA...)
 @Entity
+@Table(name = "tb_skill")
+@Data
 @NoArgsConstructor
 @AllArgsConstructor
-@Table(name = "tb_salas")
-public class Salas extends AuditBaseEntity {
+public class Skill {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long idSkill;
 
-    private Long idSala;
-
+    @Column(nullable = false, unique = true)
     private String nome;
 }

@@ -25,6 +25,8 @@ public class UsuarioEntity implements UserDetails {
 
     private String nome;
 
+    private String area;
+
     @Column(unique = true, nullable = false)
     private String email;
 
@@ -37,14 +39,26 @@ public class UsuarioEntity implements UserDetails {
     @Column(nullable = false)
     private UserRole role;
 
+    // UUID do usuário responsável por aprovar os chamados abertos por este usuário.
+    // Nulo para quem não possui aprovador definido (ex: o próprio aprovador, admins, etc).
 
 
-    public UsuarioEntity( String nome, String email, String password, String fcmToken, UserRole role) {
+    public UsuarioEntity(String nome, String email, String password, String fcmToken, UserRole role) {
         this.nome = nome;
         this.email = email;
         this.password = password;
         this.fcmToken = fcmToken;
         this.role = role;
+        this.area = area;
+    }
+
+    public UsuarioEntity(String nome, String email, String password, String fcmToken, UserRole role, String area) {
+        this.nome = nome;
+        this.email = email;
+        this.password = password;
+        this.fcmToken = fcmToken;
+        this.role = role;
+        this.area = area;
     }
 
     // =======================================================
@@ -53,15 +67,14 @@ public class UsuarioEntity implements UserDetails {
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
-        // Se o usuário for ADMIN, ele também terá as permissões do role USER
+        // ADMIN acumula a permissão de USER também
         if (this.role == UserRole.ADMIN) {
             return List.of(
                     new SimpleGrantedAuthority("ROLE_ADMIN"),
                     new SimpleGrantedAuthority("ROLE_USER")
             );
-        } else {
-            return List.of(new SimpleGrantedAuthority("ROLE_USER"));
         }
+        return List.of(new SimpleGrantedAuthority(this.role.getRole()));
     }
 
     // =======================================================
