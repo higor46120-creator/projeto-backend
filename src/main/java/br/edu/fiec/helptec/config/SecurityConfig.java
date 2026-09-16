@@ -32,9 +32,10 @@ public class SecurityConfig {
 
     private static final String[] PUBLIC_MATCHERS = {
             "/api/v1/auth/**",
-
             "/oauth2/**",
             "/login/oauth2/**",
+
+            "/images/**",   // ← novo: libera acesso às imagens sem exigir JWT
 
             "/v3/api-docs/**",
             "/v3/api-docs.yaml",

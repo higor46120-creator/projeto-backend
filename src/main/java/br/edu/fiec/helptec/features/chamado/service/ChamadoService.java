@@ -2,6 +2,7 @@ package br.edu.fiec.helptec.features.chamado.service;
 
 import br.edu.fiec.helptec.features.chamado.Chamado;
 import br.edu.fiec.helptec.features.chamado.StatusChamado;
+import br.edu.fiec.helptec.features.chamado.model.dto.ChamadoCsvDTO;
 import br.edu.fiec.helptec.features.chamado.model.dto.ChamadoDTO;
 import br.edu.fiec.helptec.features.chamado.model.dto.ChamadoFilterDTO;
 import br.edu.fiec.helptec.features.chamado.repository.ChamadoRepository;
@@ -10,11 +11,18 @@ import br.edu.fiec.helptec.features.commons.PageResponseDTO;
 import br.edu.fiec.helptec.features.usuario.model.entity.UserRole;
 import br.edu.fiec.helptec.features.usuario.model.entity.UsuarioEntity;
 import br.edu.fiec.helptec.features.usuario.repository.UsuarioRepository;
+import com.opencsv.bean.CsvToBean;
+import com.opencsv.bean.CsvToBeanBuilder;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.Reader;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -45,13 +53,11 @@ public class ChamadoService {
     }
 
     // ---------------------------------------------------------
-    // 1. Abertura do chamado: auto-popula o aprovador do solicitante
+    // 1. Abertura do chamado
     // ---------------------------------------------------------
     public ChamadoDTO criar(ChamadoDTO dto) {
         UsuarioEntity solicitante = usuarioRepository.findById(dto.getIdUsuario())
                 .orElseThrow(() -> new RuntimeException("Usuário solicitante não encontrado"));
-
-
 
         Chamado chamado = toEntity(dto);
         chamado.setIdChamado(null);
@@ -63,6 +69,35 @@ public class ChamadoService {
         chamado.setResolucao(null);
 
         return toDTO(chamadoRepository.save(chamado));
+    }
+
+    // ---------------------------------------------------------
+    // Importação em massa via CSV
+    // ---------------------------------------------------------
+    public List<ChamadoDTO> importarCsv(MultipartFile file) throws IOException {
+        try (Reader reader = new InputStreamReader(file.getInputStream())) {
+            CsvToBean<ChamadoCsvDTO> csvToBean = new CsvToBeanBuilder<ChamadoCsvDTO>(reader)
+                    .withType(ChamadoCsvDTO.class)
+                    .withIgnoreLeadingWhiteSpace(true)
+                    .build();
+
+            List<ChamadoCsvDTO> linhas = csvToBean.parse();
+            List<ChamadoDTO> criados = new ArrayList<>();
+
+            for (ChamadoCsvDTO linha : linhas) {
+                ChamadoDTO dto = new ChamadoDTO();
+                dto.setIdUsuario(UUID.fromString(linha.getIdUsuario()));
+                dto.setDescricao(linha.getDescricao());
+                dto.setPrioridade(linha.getPrioridade());
+                dto.setCriticidade(linha.getCriticidade());
+                dto.setIdEquipamento(linha.getIdEquipamento());
+                dto.setIdSala(linha.getIdSala());
+
+                criados.add(criar(dto));
+            }
+
+            return criados;
+        }
     }
 
     // ---------------------------------------------------------
@@ -79,7 +114,6 @@ public class ChamadoService {
     public ChamadoDTO reprovar(Long idChamado, UUID idUsuarioLogado) {
         Chamado chamado = buscarOuFalhar(idChamado);
         validarStatus(chamado, StatusChamado.AGUARDANDO_APROVACAO);
-
 
         chamado.setStatus(StatusChamado.REPROVADO);
         return toDTO(chamadoRepository.save(chamado));
@@ -140,10 +174,9 @@ public class ChamadoService {
         }
     }
 
-
     private ChamadoDTO toDTO(Chamado c) {
         return new ChamadoDTO(
-                c.getIdChamado(), c.getIdUsuario(),c.getArea(), c.getIdSuporte(),
+                c.getIdChamado(), c.getIdUsuario(), c.getArea(), c.getIdSuporte(),
                 c.getDescricao(), c.getStatus(), c.getPrioridade(), c.getCriticidade(),
                 c.getDataAbertura(), c.getDataFinal(), c.getResolucao(), c.getIdEquipamento(), c.getIdSala()
         );
@@ -152,6 +185,7 @@ public class ChamadoService {
     private Chamado toEntity(ChamadoDTO dto) {
         return Chamado.builder()
                 .idChamado(dto.getIdChamado())
+                .idUsuario(dto.getIdUsuario())
                 .criticidade(dto.getCriticidade())
                 .descricao(dto.getDescricao())
                 .idSala(dto.getIdSala())
@@ -160,6 +194,5 @@ public class ChamadoService {
                 .resolucao(dto.getResolucao())
                 .dataAbertura(dto.getDataAbertura())
                 .build();
-
     }
 }

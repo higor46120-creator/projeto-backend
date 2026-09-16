@@ -4,6 +4,7 @@ spring:
 
   main:
     allow-bean-definition-overriding: true
+
   datasource:
     # URL de conexão com o banco de dados
     # Altere 'localhost:3306/nome_do_seu_banco' para os seus dados
@@ -51,6 +52,11 @@ spring:
             token-uri: https://www.googleapis.com/oauth2/v4/token
             user-info-uri: https://www.googleapis.com/oauth2/v3/userinfo
             user-name-attribute: sub
+
+  servlet:
+    multipart:
+      max-file-size: 100MB
+      max-request-size: 100MB
 
 app:
   oauth2:
