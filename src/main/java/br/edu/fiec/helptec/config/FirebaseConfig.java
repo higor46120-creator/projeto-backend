@@ -14,8 +14,10 @@ public class FirebaseConfig {
     @PostConstruct
     public void initialize() {
         try {
-            FileInputStream serviceAccount =
-                    new FileInputStream("src/main/resources/serviceAccountKey.json");
+            String userHome = System.getProperty("user.home");
+            FileInputStream serviceAccount = new FileInputStream(
+                Paths.get(userHome, "serviceAccountKey.json").toFile()
+            );
 
             FirebaseOptions options = FirebaseOptions.builder()
                     .setCredentials(GoogleCredentials.fromStream(serviceAccount))
