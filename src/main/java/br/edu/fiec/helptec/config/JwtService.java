@@ -7,6 +7,7 @@ import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.stereotype.Service;
 
 import javax.crypto.SecretKey;
@@ -82,6 +83,18 @@ public class JwtService {
     public String generateTokenWithClaims(UsuarioEntity usuario) {
         Map<String, Object> extraClaims = new HashMap<>();
         extraClaims.put("id", usuario.getId().toString()); // Adiciona o ID do usuário nas claims
+
+        return generateToken(extraClaims, usuario);
+    }
+
+    // Gera o token a partir do OAuth2User retornado pelo Google, combinado com o
+    // UsuarioEntity já resolvido/criado no banco (o "subject" do JWT continua sendo
+    // o e-mail, igual ao login tradicional, pra manter compatível com o JwtAuthenticationFilter).
+    public String generateTokenFromOAuth2User(OAuth2User oAuth2User, UsuarioEntity usuario) {
+        Map<String, Object> extraClaims = new HashMap<>();
+        extraClaims.put("id", usuario.getId().toString());
+        extraClaims.put("name", oAuth2User.getAttribute("name"));
+        extraClaims.put("pictureUrl", oAuth2User.getAttribute("picture"));
 
         return generateToken(extraClaims, usuario);
     }
