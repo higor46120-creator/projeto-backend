@@ -21,7 +21,13 @@ public class FirebaseConfig {
     @PostConstruct
     public void initialize() {
         try {
-            InputStream serviceAccount = new ClassPathResource(configFile).getInputStream();
+            InputStream serviceAccount;
+
+            if (configFile.startsWith("/")) {
+                serviceAccount = new FileInputStream(configFile);
+            } else {
+                serviceAccount = new ClassPathResource(configFile).getInputStream();
+            }
 
             FirebaseOptions options = FirebaseOptions.builder()
                     .setCredentials(GoogleCredentials.fromStream(serviceAccount))
@@ -35,4 +41,3 @@ public class FirebaseConfig {
         }
     }
 }
-
