@@ -54,20 +54,3 @@ jobs:
           tags: |
             ${{ secrets.DOCKERHUB_USERNAME }}/helptech-backend:latest
             ${{ secrets.DOCKERHUB_USERNAME }}/helptech-backend:${{ github.sha }}
-
-  deploy-ec2:
-    runs-on: self-hosted
-    needs: docker-build
-    if: github.event_name == 'push'
-
-    steps:
-      - name: Atualizar e Subir Container do Backend
-        run: |
-          docker pull ${{ secrets.DOCKERHUB_USERNAME }}/helptech-backend:latest
-          docker stop helptech-backend || true
-          docker rm helptech-backend || true
-          docker run -d \
-            --name helptech-backend \
-            --restart always \
-            -p 8080:8080 \
-            ${{ secrets.DOCKERHUB_USERNAME }}/helptech-backend:latest
