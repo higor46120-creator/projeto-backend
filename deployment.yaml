@@ -14,6 +14,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: helptech-backend
+
 spec:
   replicas: 1
 
@@ -32,6 +33,9 @@ spec:
           image: higorsantanafiec/helptech-backend:latest
           imagePullPolicy: Always
 
+          args:
+            - "--app.firebase.config-file=/etc/firebase/serviceAccountKey.json"
+
           ports:
             - containerPort: 8080
 
@@ -45,9 +49,6 @@ spec:
                 secretKeyRef:
                   name: helptech-db-secret
                   key: DB_PASSWORD
-
-            - name: APP_FIREBASE_CONFIGFILE
-              value: "/etc/firebase/serviceAccountKey.json"
 
           volumeMounts:
             - name: firebase-credentials
