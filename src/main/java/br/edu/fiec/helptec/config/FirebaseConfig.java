@@ -11,6 +11,7 @@ import org.springframework.core.io.ClassPathResource;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.file.Paths;
 
 @Configuration
 public class FirebaseConfig {
@@ -21,13 +22,10 @@ public class FirebaseConfig {
     @PostConstruct
     public void initialize() {
         try {
-            InputStream serviceAccount;
-
-            if (configFile.startsWith("/")) {
-                serviceAccount = new FileInputStream(configFile);
-            } else {
-                serviceAccount = new ClassPathResource(configFile).getInputStream();
-            }
+            String userHome = System.getProperty("user.home");
+            FileInputStream serviceAccount = new FileInputStream(
+                Paths.get(userHome, "serviceAccountKey.json").toFile()
+            );
 
             FirebaseOptions options = FirebaseOptions.builder()
                     .setCredentials(GoogleCredentials.fromStream(serviceAccount))
