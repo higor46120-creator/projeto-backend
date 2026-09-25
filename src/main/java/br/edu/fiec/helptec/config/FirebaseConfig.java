@@ -6,36 +6,74 @@ import com.google.firebase.FirebaseOptions;
 import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.core.io.ClassPathResource;
 
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardOpenOption;
 
 @Configuration
 public class FirebaseConfig {
 
-    @Value("${app.firebase.config-file:serviceAccountKey.json}")
+    @Value("${FIREBASE_SERVICE_ACCOUNT_JSON:}")
+    private String firebaseServiceAccountJson;
+
+    @Value("${app.firebase.config-file:/tmp/serviceAccountKey.json}")
     private String configFile;
 
     @PostConstruct
     public void initialize() {
         try {
-            String userHome = System.getProperty("user.home");
-            FileInputStream serviceAccount = new FileInputStream(
-                Paths.get(userHome, "serviceAccountKey.json").toFile()
-            );
+            Path configPath = Paths.get(configFile);
 
-            FirebaseOptions options = FirebaseOptions.builder()
-                    .setCredentials(GoogleCredentials.fromStream(serviceAccount))
-                    .build();
+            if (firebaseServiceAccountJson != null
+                    && !firebaseServiceAccountJson.isBlank()) {
 
-            if (FirebaseApp.getApps().isEmpty()) {
-                FirebaseApp.initializeApp(options);
+                Path parent = configPath.getParent();
+
+                if (parent != null) {
+                    Files.createDirectories(parent);
+                }
+
+                Files.writeString(
+                        configPath,
+                        firebaseServiceAccountJson,
+                        StandardCharsets.UTF_8,
+                        StandardOpenOption.CREATE,
+                        StandardOpenOption.TRUNCATE_EXISTING
+                );
             }
+
+            if (!Files.exists(configPath)) {
+                throw new IOException(
+                        "Arquivo de configuração do Firebase não encontrado: "
+                                + configPath
+                );
+            }
+
+            try (InputStream serviceAccount =
+                         new FileInputStream(configPath.toFile())) {
+
+                FirebaseOptions options = FirebaseOptions.builder()
+                        .setCredentials(
+                                GoogleCredentials.fromStream(serviceAccount)
+                        )
+                        .build();
+
+                if (FirebaseApp.getApps().isEmpty()) {
+                    FirebaseApp.initializeApp(options);
+                }
+            }
+
         } catch (IOException e) {
-            throw new RuntimeException("Erro ao inicializar o Firebase", e);
+            throw new RuntimeException(
+                    "Erro ao inicializar o Firebase",
+                    e
+            );
         }
     }
 }
