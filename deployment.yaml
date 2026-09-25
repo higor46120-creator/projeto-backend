@@ -46,7 +46,7 @@ spec:
                   name: helptech-db-secret
                   key: DB_PASSWORD
 
-            - name: APP_FIREBASE_CONFIG_FILE
+            - name: APP_FIREBASE_CONFIGFILE
               value: "/etc/firebase/serviceAccountKey.json"
 
           volumeMounts:
