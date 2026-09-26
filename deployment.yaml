@@ -50,10 +50,14 @@ spec:
                   name: helptech-db-secret
                   key: DB_PASSWORD
 
-          volumeMounts:
-            - name: firebase-credentials
-              mountPath: /etc/firebase
-              readOnly: true
+
+            - name: FIREBASE_SERVICE_ACCOUNT_JSON
+              valueFrom:
+                secretKeyRef:
+                  name: firebase-service-account
+                  key: serviceAccountKey.json
+
+ 
 
       volumes:
         - name: firebase-credentials
@@ -77,7 +81,6 @@ spec:
       port: 8080
       targetPort: 8080
       nodePort: 30080
-
 ---
 apiVersion: apps/v1
 kind: Deployment

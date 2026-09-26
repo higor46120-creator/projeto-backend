@@ -54,3 +54,13 @@ jobs:
           tags: |
             ${{ secrets.DOCKERHUB_USERNAME }}/helptech-backend:latest
             ${{ secrets.DOCKERHUB_USERNAME }}/helptech-backend:${{ github.sha }}
+  deploy-kubernetes:
+    runs-on: self-hosted
+    needs: docker-build
+
+    steps:
+      - name: Checkout do código
+        uses: actions/checkout@v4
+
+      - name: Aplicar deployment no Kubernetes
+        run: kubectl apply -f deployment.yaml
