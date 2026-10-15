@@ -61,3 +61,5 @@ spring:
 app:
   oauth2:
     redirect-uri: ${FRONTEND_OAUTH2_REDIRECT_URI:http://localhost:3000/oauth2/redirect}
+  firebase:
+    credentials-json: ${FIREBASE_CREDENTIALS_JSON:}

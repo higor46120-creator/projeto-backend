@@ -3,12 +3,13 @@ package br.edu.fiec.helptec.config;
 import com.google.auth.oauth2.GoogleCredentials;
 import com.google.firebase.FirebaseApp;
 import com.google.firebase.FirebaseOptions;
+import com.google.firebase.messaging.FirebaseMessaging;
 import jakarta.annotation.PostConstruct;
-import org.springframework.beans.factory.annotation.Value;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
-import java.io.FileInputStream;
-import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -19,61 +20,38 @@ import java.nio.file.StandardOpenOption;
 @Configuration
 public class FirebaseConfig {
 
-    @Value("${FIREBASE_SERVICE_ACCOUNT_JSON:}")
-    private String firebaseServiceAccountJson;
-
-    @Value("${app.firebase.config-file:/tmp/serviceAccountKey.json}")
-    private String configFile;
+    private static final Logger log = LoggerFactory.getLogger(FirebaseConfig.class);
 
     @PostConstruct
     public void initialize() {
         try {
-            Path configPath = Paths.get(configFile);
+            ClassPathResource resource = new ClassPathResource("serviceAccountKey.json");
 
-            if (firebaseServiceAccountJson != null
-                    && !firebaseServiceAccountJson.isBlank()) {
-
-                Path parent = configPath.getParent();
-
-                if (parent != null) {
-                    Files.createDirectories(parent);
-                }
-
-                Files.writeString(
-                        configPath,
-                        firebaseServiceAccountJson,
-                        StandardCharsets.UTF_8,
-                        StandardOpenOption.CREATE,
-                        StandardOpenOption.TRUNCATE_EXISTING
-                );
+            if (!resource.exists()) {
+                log.warn("AVISO: 'serviceAccountKey.json' não encontrado. O Firebase ficará inativo.");
+                return;
             }
 
-            if (!Files.exists(configPath)) {
-                throw new IOException(
-                        "Arquivo de configuração do Firebase não encontrado: "
-                                + configPath
-                );
-            }
-
-            try (InputStream serviceAccount =
-                         new FileInputStream(configPath.toFile())) {
-
+            try (InputStream serviceAccount = resource.getInputStream()) {
                 FirebaseOptions options = FirebaseOptions.builder()
-                        .setCredentials(
-                                GoogleCredentials.fromStream(serviceAccount)
-                        )
+                        .setCredentials(GoogleCredentials.fromStream(serviceAccount))
                         .build();
 
                 if (FirebaseApp.getApps().isEmpty()) {
                     FirebaseApp.initializeApp(options);
+                    log.info("Firebase inicializado com sucesso.");
                 }
             }
-
-        } catch (IOException e) {
-            throw new RuntimeException(
-                    "Erro ao inicializar o Firebase",
-                    e
-            );
+        } catch (Exception e) {
+            log.error("Erro ao inicializar o Firebase: {}", e.getMessage());
         }
+    }
+
+    @Bean
+    public FirebaseMessaging firebaseMessaging() {
+        if (FirebaseApp.getApps().isEmpty()) {
+            return null;
+        }
+        return FirebaseMessaging.getInstance();
     }
 }

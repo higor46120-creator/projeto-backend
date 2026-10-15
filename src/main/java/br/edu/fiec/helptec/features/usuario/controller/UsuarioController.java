@@ -1,13 +1,17 @@
 package br.edu.fiec.helptec.features.usuario.controller;
 
+import br.edu.fiec.helptec.config.UserContext;
 import br.edu.fiec.helptec.features.commons.PageRequestDTO;
 import br.edu.fiec.helptec.features.commons.PageResponseDTO;
 import br.edu.fiec.helptec.features.usuario.model.dto.CreateUsuarioRequestDTO;
+import br.edu.fiec.helptec.features.usuario.model.dto.MeResponseDTO;
 import br.edu.fiec.helptec.features.usuario.model.dto.UsuarioResponseDTO;
+import br.edu.fiec.helptec.features.usuario.model.entity.UsuarioEntity;
 import br.edu.fiec.helptec.features.usuario.service.UsuarioService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
 
 import java.util.List;
 import java.util.UUID;
@@ -39,6 +43,18 @@ public class UsuarioController {
             @RequestParam(defaultValue = "10") int size) {
         PageRequestDTO pageRequest = new PageRequestDTO(page, size);
         return ResponseEntity.ok(usuarioService.listarPaginado(pageRequest));
+    }
+
+    // Dados do usuário autenticado (identificado pelo JWT)
+    @GetMapping("/me")
+    public ResponseEntity<MeResponseDTO> me() {
+        UsuarioEntity usuarioLogado = UserContext.getUser();
+
+        if (usuarioLogado == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+
+        return ResponseEntity.ok(MeResponseDTO.from(usuarioLogado));
     }
 
     @GetMapping("/{id}")
