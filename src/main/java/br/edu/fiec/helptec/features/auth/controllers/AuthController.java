@@ -1,6 +1,7 @@
 package br.edu.fiec.helptec.features.auth.controllers;
 
 import br.edu.fiec.helptec.features.auth.models.AuthResponse;
+import br.edu.fiec.helptec.features.auth.models.GoogleLoginRequest;
 import br.edu.fiec.helptec.features.auth.models.LoginRequest;
 import br.edu.fiec.helptec.features.auth.models.RegisterRequest;
 import br.edu.fiec.helptec.features.auth.service.AuthService;
@@ -32,5 +33,10 @@ public class AuthController {
     public ResponseEntity<AuthResponse> login(@RequestBody @Valid LoginRequest request) {
         AuthResponse response = authService.login(request);
         return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/google")
+    public ResponseEntity<AuthResponse> loginComGoogle(@RequestBody @Valid GoogleLoginRequest request) {
+        return ResponseEntity.ok(authService.loginComGoogle(request));
     }
 }

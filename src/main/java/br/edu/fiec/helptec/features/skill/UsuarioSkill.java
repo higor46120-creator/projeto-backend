@@ -4,6 +4,7 @@ import br.edu.fiec.helptec.features.commons.AuditBaseEntity;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 
 import java.util.UUID;
@@ -12,6 +13,7 @@ import java.util.UUID;
 @Entity
 @Table(name = "tb_usuario_skill", uniqueConstraints = @UniqueConstraint(columnNames = {"idUsuario", "idSkill"}))
 @Data
+@EqualsAndHashCode(callSuper = false)
 @NoArgsConstructor
 @AllArgsConstructor
 public class UsuarioSkill extends AuditBaseEntity {

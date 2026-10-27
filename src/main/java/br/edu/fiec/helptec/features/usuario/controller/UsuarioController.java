@@ -10,6 +10,7 @@ import br.edu.fiec.helptec.features.usuario.model.entity.UsuarioEntity;
 import br.edu.fiec.helptec.features.usuario.service.UsuarioService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 
@@ -47,13 +48,10 @@ public class UsuarioController {
 
     // Dados do usuário autenticado (identificado pelo JWT)
     @GetMapping("/me")
-    public ResponseEntity<MeResponseDTO> me() {
-        UsuarioEntity usuarioLogado = UserContext.getUser();
-
+    public ResponseEntity<MeResponseDTO> me(@AuthenticationPrincipal UsuarioEntity usuarioLogado) {
         if (usuarioLogado == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
-
         return ResponseEntity.ok(MeResponseDTO.from(usuarioLogado));
     }
 
