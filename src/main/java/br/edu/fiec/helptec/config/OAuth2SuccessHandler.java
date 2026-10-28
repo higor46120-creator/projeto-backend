@@ -24,7 +24,7 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
     private final UsuarioRepository usuarioRepository;
     private final PasswordEncoder passwordEncoder;
 
-    @Value("${app.oauth2.redirect-uri:http://localhost:3000/oauth2/redirect}")
+    @Value("${app.oauth2.redirect-uri:http://10.5.36.3:3000/oauth2/redirect}")
     private String redirectUri;
 
     public OAuth2SuccessHandler(JwtService jwtService, UsuarioRepository usuarioRepository, PasswordEncoder passwordEncoder) {
