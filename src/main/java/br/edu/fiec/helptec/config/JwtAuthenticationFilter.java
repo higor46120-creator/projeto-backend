@@ -1,6 +1,7 @@
 package br.edu.fiec.helptec.config;
 
 import com.google.firebase.internal.NonNull;
+import io.jsonwebtoken.JwtException;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -9,6 +10,7 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
@@ -45,13 +47,28 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         // Extrai o token após o trecho "Bearer "
         jwt = authHeader.substring(7);
-        userEmail = jwtService.extractUsername(jwt);
+        try {
+            userEmail = jwtService.extractUsername(jwt);
+        } catch (JwtException | IllegalArgumentException e) {
+            // Token expirado, malformado ou assinado com outra chave: segue sem autenticar.
+            // Rotas públicas (ex.: login) continuam funcionando; rotas protegidas respondem 401.
+            logger.debug("JWT inválido ignorado: " + e.getMessage());
+            filterChain.doFilter(request, response);
+            return;
+        }
 
         // Se encontrou o e-mail no token e o usuário ainda não está autenticado no contexto
         if (userEmail != null && SecurityContextHolder.getContext().getAuthentication() == null) {
 
             // Busca o usuário na base de dados através do serviço
-            UserDetails userDetails = this.userDetailsService.loadUserByUsername(userEmail);
+            UserDetails userDetails;
+            try {
+                userDetails = this.userDetailsService.loadUserByUsername(userEmail);
+            } catch (UsernameNotFoundException e) {
+                // Token de um usuário que não existe mais: segue sem autenticar
+                filterChain.doFilter(request, response);
+                return;
+            }
 
             // Valida o token
             if (jwtService.isTokenValid(jwt, userDetails)) {
