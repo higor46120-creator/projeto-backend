@@ -8,6 +8,8 @@ data:
   DB_PORT: "3310"
   DB_NAME: "helptec"
   DB_USER: "root"
+  # Troque pelo bucket do seu projeto (Firebase Console > Storage)
+  FIREBASE_STORAGE_BUCKET: "SEU-PROJETO.firebasestorage.app"
 
 ---
 apiVersion: apps/v1
@@ -33,9 +35,6 @@ spec:
           image: higorsantanafiec/helptech-backend:latest
           imagePullPolicy: Always
 
-          args:
-            - "--app.firebase.config-file=/etc/firebase/serviceAccountKey.json"
-
           ports:
             - containerPort: 8080
 
@@ -50,14 +49,33 @@ spec:
                   name: helptech-db-secret
                   key: DB_PASSWORD
 
-
-            - name: FIREBASE_SERVICE_ACCOUNT_JSON
+            # Chave do JWT (Base64). Sem ela, os tokens param de valer a cada reinício do pod.
+            - name: JWT_SECRET
               valueFrom:
                 secretKeyRef:
-                  name: firebase-service-account
-                  key: serviceAccountKey.json
+                  name: helptech-jwt-secret
+                  key: JWT_SECRET
 
- 
+            # Login com Google (obrigatórios: sem eles a aplicação não sobe)
+            - name: GOOGLE_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: helptech-google-oauth
+                  key: GOOGLE_CLIENT_ID
+            - name: GOOGLE_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: helptech-google-oauth
+                  key: GOOGLE_CLIENT_SECRET
+
+            # Firebase: lido do arquivo montado pelo volume abaixo
+            - name: FIREBASE_CONFIG_FILE
+              value: /etc/firebase/serviceAccountKey.json
+
+          volumeMounts:
+            - name: firebase-credentials
+              mountPath: /etc/firebase
+              readOnly: true
 
       volumes:
         - name: firebase-credentials

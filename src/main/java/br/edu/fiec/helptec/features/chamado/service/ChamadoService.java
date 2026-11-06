@@ -106,7 +106,7 @@ public class ChamadoService {
     public ChamadoDTO aprovar(Long idChamado, UUID idUsuarioLogado) {
         Chamado chamado = buscarOuFalhar(idChamado);
         validarStatus(chamado, StatusChamado.AGUARDANDO_APROVACAO);
-        chamado.setIdUsuario(idUsuarioLogado);
+        // idUsuario continua sendo o solicitante; não sobrescrever com o aprovador
         chamado.setStatus(StatusChamado.APROVADO);
         return toDTO(chamadoRepository.save(chamado));
     }

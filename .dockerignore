@@ -1,0 +1,13 @@
+# Nunca levar credenciais para dentro da imagem
+**/serviceAccountKey.json
+**/application-local.*
+**/application-secrets.*
+.env
+
+# Arquivos que não são necessários no build
+.git
+.github
+.idea
+target
+*.iml
+deployment.yaml

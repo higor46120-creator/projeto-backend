@@ -41,8 +41,6 @@ public class SecurityConfig {
             "/oauth2/**",
             "/login/oauth2/**",
 
-            "/api/chamados/**", // ← Rota pública: POST e GET liberados sem exigência de JWT ou OAuth2
-
             "/images/**",
 
             "/v3/api-docs/**",
