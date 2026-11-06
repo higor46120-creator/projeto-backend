@@ -80,9 +80,9 @@ public class EquipamentoRepositoryCustomImpl implements EquipamentoRepositoryCus
         if (filtro.getTermo() != null && !filtro.getTermo().trim().isEmpty()) {
             String pattern = "%" + filtro.getTermo().toLowerCase() + "%";
             Predicate nomeLike = cb.like(cb.lower(root.get("nome")), pattern);
-            Predicate marcaLike = cb.like(cb.lower(root.get("marca")), pattern);
-            Predicate modeloLike = cb.like(cb.lower(root.get("modelo")), pattern);
-            predicates.add(cb.or(nomeLike, marcaLike, modeloLike));
+            Predicate patrimonioLike = cb.like(cb.lower(root.get("patrimonio")), pattern);
+            Predicate statusLike = cb.like(cb.lower(root.get("status")), pattern);
+            predicates.add(cb.or(nomeLike, patrimonioLike, statusLike));
         }
 
         // Filtros específicos
@@ -90,16 +90,16 @@ public class EquipamentoRepositoryCustomImpl implements EquipamentoRepositoryCus
             predicates.add(cb.like(cb.lower(root.get("nome")), "%" + filtro.getNome().toLowerCase() + "%"));
         }
 
-        if (filtro.getMarca() != null && !filtro.getMarca().trim().isEmpty()) {
-            predicates.add(cb.like(cb.lower(root.get("marca")), "%" + filtro.getMarca().toLowerCase() + "%"));
+        if (filtro.getPatrimonio() != null && !filtro.getPatrimonio().trim().isEmpty()) {
+            predicates.add(cb.like(cb.lower(root.get("patrimonio")), "%" + filtro.getPatrimonio().toLowerCase() + "%"));
         }
 
-        if (filtro.getModelo() != null && !filtro.getModelo().trim().isEmpty()) {
-            predicates.add(cb.like(cb.lower(root.get("modelo")), "%" + filtro.getModelo().toLowerCase() + "%"));
+        if (filtro.getStatus() != null && !filtro.getStatus().trim().isEmpty()) {
+            predicates.add(cb.like(cb.lower(root.get("status")), "%" + filtro.getStatus().toLowerCase() + "%"));
         }
 
-        if (filtro.getNumeroSérie() != null && !filtro.getNumeroSérie().trim().isEmpty()) {
-            predicates.add(cb.like(cb.lower(root.get("numeroSérie")), "%" + filtro.getNumeroSérie().toLowerCase() + "%"));
+        if (filtro.getTipo() != null && !filtro.getTipo().trim().isEmpty()) {
+            predicates.add(cb.like(cb.lower(root.get("tipo")), "%" + filtro.getTipo().toLowerCase() + "%"));
         }
 
         if (filtro.getPrecoMin() != null) {
