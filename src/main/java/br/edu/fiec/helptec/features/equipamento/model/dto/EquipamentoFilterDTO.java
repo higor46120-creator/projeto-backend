@@ -11,9 +11,9 @@ public class EquipamentoFilterDTO {
 
     private String termo;
     private String nome;
-    private String marca;
-    private String modelo;
-    private String numeroSérie;
+    private String patrimonio;
+    private String status;
+    private String tipo;
     private Double precoMin;
     private Double precoMax;
 }

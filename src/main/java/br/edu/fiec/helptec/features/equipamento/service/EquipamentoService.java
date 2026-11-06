@@ -53,9 +53,9 @@ public class EquipamentoService {
                 .orElseThrow(() -> new RuntimeException("Equipamento não encontrado"));
 
         existente.setNome(dto.getNome());
-        existente.setMarca(dto.getMarca());
-        existente.setModelo(dto.getModelo());
-        existente.setNumeroSérie(dto.getNumeroSérie());
+        existente.setPatrimonio(dto.getPatrimonio());
+        existente.setStatus(dto.getStatus());
+        existente.setTipo(dto.getTipo());
         existente.setPreco(dto.getPreco());
 
         Equipamento atualizado = equipamentoRepository.save(existente);
@@ -72,10 +72,10 @@ public class EquipamentoService {
 
     // METODOS AUXILIARES DE CONVERSÃO (Faltando na sua classe)
     private EquipamentoDTO toDTO(Equipamento e) {
-        return new EquipamentoDTO(e.getId(), e.getNome(), e.getMarca(), e.getModelo(), e.getNumeroSérie(), e.getPreco());
+        return new EquipamentoDTO(e.getId(), e.getNome(), e.getPatrimonio(), e.getStatus(), e.getTipo(), e.getPreco());
     }
 
     private Equipamento toEntity(EquipamentoDTO dto) {
-        return new Equipamento(dto.getId(), dto.getNome(), dto.getMarca(), dto.getModelo(), dto.getNumeroSérie(), dto.getPreco());
+        return new Equipamento(dto.getId(), dto.getNome(), dto.getPatrimonio(), dto.getStatus(), dto.getTipo(), dto.getPreco());
     }
 }

@@ -24,9 +24,9 @@ public class Equipamento extends AuditBaseEntity {
     private Long id;
 
     private String nome;
-    private String marca;
-    private String modelo;
-    private String numeroSérie;
+    private String patrimonio;//patrimonio
+    private String status;//status
+    private String tipo;//tipo
     private Double preco;
 
 }

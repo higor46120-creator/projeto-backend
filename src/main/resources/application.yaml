@@ -63,3 +63,5 @@ app:
     redirect-uri: ${FRONTEND_OAUTH2_REDIRECT_URI:http://localhost:3000/oauth2/redirect}
   firebase:
     credentials-json: ${FIREBASE_CREDENTIALS_JSON:}
+  google:
+      extra-client-ids: 801876311719-o76pql4jcc9uc5m58qtvp7m7dvq8g6ap.apps.googleusercontent.com

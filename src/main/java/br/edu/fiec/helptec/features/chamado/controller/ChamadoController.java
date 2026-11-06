@@ -49,6 +49,11 @@ public class ChamadoController {
     // a partir do campo idAprovador do usuário solicitante.
     @PostMapping
     public ResponseEntity<ChamadoDTO> criar(@RequestBody ChamadoDTO dto) {
+        UsuarioEntity solicitante = UserContext.getUser();
+        if (solicitante == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        dto.setIdUsuario(solicitante.getId());
         return ResponseEntity.status(HttpStatus.CREATED).body(chamadoService.criar(dto));
     }
 
