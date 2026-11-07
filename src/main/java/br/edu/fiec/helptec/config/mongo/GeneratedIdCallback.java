@@ -1,5 +1,6 @@
 package br.edu.fiec.helptec.config.mongo;
 
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.core.Ordered;
 import org.springframework.data.mongodb.core.mapping.event.BeforeConvertCallback;
 import org.springframework.stereotype.Component;
@@ -12,13 +13,16 @@ import java.util.UUID;
  * Antes de salvar, preenche os campos anotados com {@link GeneratedId} que ainda estão nulos.
  * Roda depois da auditoria (ordem maior), para que o documento ainda seja
  * reconhecido como "novo" e receba createdDate/createdBy.
+ *
+ * O SequenceGeneratorService é obtido de forma preguiçosa (ObjectProvider) para evitar
+ * o ciclo de beans: MongoTemplate -> conversor -> este callback -> serviço -> MongoTemplate.
  */
 @Component
 public class GeneratedIdCallback implements BeforeConvertCallback<Object>, Ordered {
 
-    private final SequenceGeneratorService sequenceGenerator;
+    private final ObjectProvider<SequenceGeneratorService> sequenceGenerator;
 
-    public GeneratedIdCallback(SequenceGeneratorService sequenceGenerator) {
+    public GeneratedIdCallback(ObjectProvider<SequenceGeneratorService> sequenceGenerator) {
         this.sequenceGenerator = sequenceGenerator;
     }
 
@@ -36,7 +40,7 @@ public class GeneratedIdCallback implements BeforeConvertCallback<Object>, Order
         }
 
         if (Long.class.equals(field.getType())) {
-            ReflectionUtils.setField(field, entity, sequenceGenerator.proximoValor(collection));
+            ReflectionUtils.setField(field, entity, sequenceGenerator.getObject().proximoValor(collection));
         } else if (UUID.class.equals(field.getType())) {
             ReflectionUtils.setField(field, entity, UUID.randomUUID());
         } else {
