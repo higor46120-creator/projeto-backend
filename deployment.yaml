@@ -4,10 +4,8 @@ metadata:
   name: helptech-config
 data:
   DB_PROJECT_NAME: "helptec"
-  DB_HOST: "host.minikube.internal"
-  DB_PORT: "3310"
-  DB_NAME: "helptec"
-  DB_USER: "root"
+  # Nome do banco dentro do cluster MongoDB Atlas
+  MONGODB_DATABASE: "helptec"
   # Troque pelo bucket do seu projeto (Firebase Console > Storage)
   FIREBASE_STORAGE_BUCKET: "SEU-PROJETO.firebasestorage.app"
 
@@ -43,11 +41,12 @@ spec:
                 name: helptech-config
 
           env:
-            - name: DB_PASSWORD
+            # String de conexão do MongoDB Atlas (contém usuário e senha)
+            - name: MONGODB_URI
               valueFrom:
                 secretKeyRef:
-                  name: helptech-db-secret
-                  key: DB_PASSWORD
+                  name: helptech-mongodb
+                  key: MONGODB_URI
 
             # Chave do JWT (Base64). Sem ela, os tokens param de valer a cada reinício do pod.
             - name: JWT_SECRET

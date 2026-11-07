@@ -1,24 +1,22 @@
 package br.edu.fiec.helptec.features.equipamento;
 
+import br.edu.fiec.helptec.config.mongo.GeneratedId;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.mapping.Document;
+
 
 import br.edu.fiec.helptec.features.commons.AuditBaseEntity;
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Table;
 import lombok.*;
-import jakarta.persistence.Id;
 
 @Data
 @EqualsAndHashCode(callSuper = false)
-@Entity
+@Document(collection = "equipamentos")
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@Table(name = "tb_equipamento")
 public class Equipamento extends AuditBaseEntity {
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @GeneratedId
     private Long id;
 
     private String nome;

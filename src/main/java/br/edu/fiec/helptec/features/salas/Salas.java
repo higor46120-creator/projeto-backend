@@ -1,21 +1,23 @@
 package br.edu.fiec.helptec.features.salas;
 
+import br.edu.fiec.helptec.config.mongo.GeneratedId;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.mapping.Document;
+
 import br.edu.fiec.helptec.features.commons.AuditBaseEntity;
-import jakarta.persistence.*;
 import lombok.*;
 
 
 @Data
 @EqualsAndHashCode(callSuper = false)
 @Builder
-@Entity
+@Document(collection = "salas")
 @NoArgsConstructor
 @AllArgsConstructor
-@Table(name = "tb_salas")
 public class Salas extends AuditBaseEntity {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @GeneratedId
 
     private Long idSala;
 

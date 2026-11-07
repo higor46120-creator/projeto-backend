@@ -1,6 +1,10 @@
 package br.edu.fiec.helptec.features.usuario.model.entity;
 
-import jakarta.persistence.*;
+import br.edu.fiec.helptec.config.mongo.GeneratedId;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.index.Indexed;
+import org.springframework.data.mongodb.core.mapping.Document;
+
 import lombok.*;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -15,28 +19,24 @@ import java.util.UUID;
 @AllArgsConstructor
 @NoArgsConstructor
 @Builder
-@Entity
-@Table(name = "tb_usuario")
+@Document(collection = "usuarios")
 public class UsuarioEntity implements UserDetails {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
+    @GeneratedId
     private UUID id;
 
     private String nome;
 
     private String area;
 
-    @Column(unique = true, nullable = false)
+    @Indexed(unique = true)
     private String email;
 
-    @Column(nullable = false)
     private String password;
 
     private String fcmToken;
 
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
     private UserRole role;
 
     // UUID do usuário responsável por aprovar os chamados abertos por este usuário.
