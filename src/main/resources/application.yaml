@@ -2,10 +2,16 @@ spring:
   application:
     name: ${DB_PROJECT_NAME:helptec}
 
+  # Lê variáveis de um arquivo .env na raiz do projeto, se existir (não vai para o Git).
+  # Modelo: .env.example. Variáveis de ambiente do sistema continuam valendo.
+  config:
+    import: optional:file:.env[.properties]
+
   main:
     allow-bean-definition-overriding: true
 
   # ===== MongoDB =====
+  # Sem MONGODB_URI usa o MongoDB local (localhost:27017). Ver perfis "local" e "professor".
   # A string de conexão (com usuário e senha) vem SÓ da variável de ambiente MONGODB_URI.
   # Nunca coloque a senha aqui: este repositório é público.
   # Formato: mongodb+srv://<usuario>:<senha>@<cluster>/?retryWrites=true&w=majority
