@@ -1,0 +1,409 @@
+From 8ade0a3ba243c6fff51e8635cff203205393c2d7 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Thu, 12 Nov 2026 20:59:15 -0300
+Subject: [PATCH] =?UTF-8?q?Prepara=20execu=C3=A7=C3=A3o=20local=20com=20Mo?=
+ =?UTF-8?q?ngoDB=20e=20perfil=20para=20o=20banco=20do=20professor?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+- Perfil local: MongoDB em localhost (docker-compose), dados iniciais e
+  usuários de teste por papel (DadosIniciaisLocal)
+- Perfil professor: conexão só por MONGODB_URI, sem dados iniciais
+- Leitura opcional de .env na raiz e .env.example documentado
+- README com o passo a passo
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_012xpyFRPS2vqxyuCv6P8vvC
+---
+ .env.example                                  |  26 +++
+ README.md                                     |  51 ++++++
+ docker-compose.yml                            |  29 ++++
+ .../helptec/config/DadosIniciaisLocal.java    | 154 ++++++++++++++++++
+ src/main/resources/application-local.yaml     |  35 ++++
+ src/main/resources/application-professor.yaml |  22 +++
+ src/main/resources/application.yaml           |   6 +
+ 7 files changed, 323 insertions(+)
+ create mode 100644 .env.example
+ create mode 100644 docker-compose.yml
+ create mode 100644 src/main/java/br/edu/fiec/helptec/config/DadosIniciaisLocal.java
+ create mode 100644 src/main/resources/application-local.yaml
+ create mode 100644 src/main/resources/application-professor.yaml
+
+diff --git a/.env.example b/.env.example
+new file mode 100644
+index 0000000..930eec0
+--- /dev/null
++++ b/.env.example
+@@ -0,0 +1,26 @@
++# Copie este arquivo para ".env" (na raiz do projeto) e preencha.
++# O .env está no .gitignore: NUNCA suba senhas para o GitHub.
++
++# ---------- Qual banco usar ----------
++# local     -> MongoDB na sua máquina (docker compose up -d)
++# professor -> MongoDB Atlas do professor (preencha MONGODB_URI abaixo)
++spring.profiles.active=local
++
++# ---------- Perfil professor ----------
++# MONGODB_URI=mongodb+srv://USUARIO:SENHA@CLUSTER.mongodb.net/?retryWrites=true&w=majority
++# MONGODB_DATABASE=helptec
++
++# ---------- Perfil local (opcionais) ----------
++# MONGODB_URI_LOCAL=mongodb://localhost:27017
++# MONGODB_DATABASE_LOCAL=helptec_local
++# SEED_SENHA=helptec123
++# Seu e-mail do Google, para entrar no app com "Entrar com Google" como ADMIN:
++# SEED_GOOGLE_ADMIN_EMAIL=seu.email@gmail.com
++
++# ---------- Comuns ----------
++# Chave do JWT em Base64 (openssl rand -base64 64). Vazia = gera uma aleatória a cada execução.
++# JWT_SECRET=
++# GOOGLE_CLIENT_ID=
++# GOOGLE_CLIENT_SECRET=
++# FIREBASE_CREDENTIALS_JSON=
++# FIREBASE_STORAGE_BUCKET=
+diff --git a/README.md b/README.md
+index eef0043..f30d207 100644
+--- a/README.md
++++ b/README.md
+@@ -1 +1,52 @@
+ #Projeto Backend
++
++## Rodando com MongoDB (branch `feature/migracao-mongodb`)
++
++O banco é escolhido pelo **perfil** do Spring:
++
++| Perfil | Banco | Dados iniciais |
++| --- | --- | --- |
++| `local` | MongoDB na sua máquina (`localhost:27017`, banco `helptec_local`) | Sim: usuários de teste, salas, equipamentos e skills |
++| `professor` | MongoDB Atlas do professor (`MONGODB_URI`) | Não |
++
++### 1. Configurar
++Copie `.env.example` para `.env` na raiz do projeto. O `.env` não vai para o Git.
++Para testar localmente deixe `spring.profiles.active=local`.
++
++### 2. Subir o MongoDB local
++Com Docker Desktop:
++```bash
++docker compose up -d
++```
++Isso sobe o MongoDB na porta 27017 e uma interface web em http://localhost:8081.
++Sem Docker, instale o *MongoDB Community Server* (e o Compass para ver os dados).
++
++### 3. Rodar o backend
++Rode a `HelptecApplication` no IntelliJ (ou `./mvnw spring-boot:run`).
++Na primeira execução o console mostra `[seed] ...` com o que foi criado.
++
++Usuários de teste (senha `helptec123`, área "Informática"):
++
++| E-mail | Papel |
++| --- | --- |
++| usuario@helptec.local | USER |
++| aprovador@helptec.local | APROVADOR |
++| gerente@helptec.local | GERENTE |
++| suporte@helptec.local | SUPORTE |
++| admin@helptec.local | ADMIN |
++
++Entram por `POST /api/v1/auth/login` (Swagger em `/swagger-ui.html`).
++Para entrar pelo **Google** no app, defina `SEED_GOOGLE_ADMIN_EMAIL` com o seu e-mail:
++ele é cadastrado como ADMIN no banco local.
++
++Para zerar o banco local: `docker compose down -v` (o seed roda de novo na próxima execução).
++
++### 4. Trocar para o banco do professor
++No `.env`:
++```properties
++spring.profiles.active=professor
++MONGODB_URI=mongodb+srv://USUARIO:SENHA@CLUSTER.mongodb.net/?retryWrites=true&w=majority
++MONGODB_DATABASE=helptec
++```
++Se a conexão der *timeout*, a rede pode estar bloqueando a porta 27017 ou o seu IP não está liberado
++no Atlas (*Network Access*). Teste com `Test-NetConnection <host-do-cluster> -Port 27017`.
+diff --git a/docker-compose.yml b/docker-compose.yml
+new file mode 100644
+index 0000000..adf8507
+--- /dev/null
++++ b/docker-compose.yml
+@@ -0,0 +1,29 @@
++# MongoDB local para testes (perfil "local").
++#   Subir:   docker compose up -d
++#   Parar:   docker compose down        (os dados ficam no volume)
++#   Zerar:   docker compose down -v     (apaga o banco; o seed roda de novo)
++# Interface web do banco: http://localhost:8081
++services:
++  mongodb:
++    image: mongo:7
++    container_name: helptec-mongodb
++    ports:
++      - "27017:27017"
++    volumes:
++      - helptec-mongo-data:/data/db
++    restart: unless-stopped
++
++  mongo-express:
++    image: mongo-express:1
++    container_name: helptec-mongo-express
++    ports:
++      - "8081:8081"
++    environment:
++      ME_CONFIG_MONGODB_URL: mongodb://mongodb:27017/
++      ME_CONFIG_BASICAUTH: "false"
++    depends_on:
++      - mongodb
++    restart: unless-stopped
++
++volumes:
++  helptec-mongo-data:
+diff --git a/src/main/java/br/edu/fiec/helptec/config/DadosIniciaisLocal.java b/src/main/java/br/edu/fiec/helptec/config/DadosIniciaisLocal.java
+new file mode 100644
+index 0000000..d5555a6
+--- /dev/null
++++ b/src/main/java/br/edu/fiec/helptec/config/DadosIniciaisLocal.java
+@@ -0,0 +1,154 @@
++package br.edu.fiec.helptec.config;
++
++import br.edu.fiec.helptec.features.equipamento.Equipamento;
++import br.edu.fiec.helptec.features.equipamento.repository.EquipamentoRepository;
++import br.edu.fiec.helptec.features.salas.Salas;
++import br.edu.fiec.helptec.features.salas.repository.SalasRepository;
++import br.edu.fiec.helptec.features.skill.Skill;
++import br.edu.fiec.helptec.features.skill.repository.SkillRepository;
++import br.edu.fiec.helptec.features.usuario.model.entity.UserRole;
++import br.edu.fiec.helptec.features.usuario.model.entity.UsuarioEntity;
++import br.edu.fiec.helptec.features.usuario.repository.UsuarioRepository;
++import org.slf4j.Logger;
++import org.slf4j.LoggerFactory;
++import org.springframework.beans.factory.annotation.Value;
++import org.springframework.boot.ApplicationArguments;
++import org.springframework.boot.ApplicationRunner;
++import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
++import org.springframework.security.crypto.password.PasswordEncoder;
++import org.springframework.stereotype.Component;
++
++import java.util.List;
++import java.util.UUID;
++
++/**
++ * Popula o banco LOCAL na primeira execução, para dar para testar sem cadastrar nada à mão.
++ * Só roda com app.seed.enabled=true (ligado no perfil "local", desligado no "professor").
++ * Cada parte só é criada se a collection estiver vazia: rodar de novo não duplica nada.
++ */
++@Component
++@ConditionalOnProperty(name = "app.seed.enabled", havingValue = "true")
++public class DadosIniciaisLocal implements ApplicationRunner {
++
++    private static final Logger log = LoggerFactory.getLogger(DadosIniciaisLocal.class);
++    private static final String AREA_TESTE = "Informática";
++
++    private final UsuarioRepository usuarioRepository;
++    private final SalasRepository salasRepository;
++    private final EquipamentoRepository equipamentoRepository;
++    private final SkillRepository skillRepository;
++    private final PasswordEncoder passwordEncoder;
++
++    @Value("${app.seed.senha:helptec123}")
++    private String senhaTeste;
++
++    @Value("${app.seed.google-admin-email:}")
++    private String googleAdminEmail;
++
++    public DadosIniciaisLocal(UsuarioRepository usuarioRepository,
++                              SalasRepository salasRepository,
++                              EquipamentoRepository equipamentoRepository,
++                              SkillRepository skillRepository,
++                              PasswordEncoder passwordEncoder) {
++        this.usuarioRepository = usuarioRepository;
++        this.salasRepository = salasRepository;
++        this.equipamentoRepository = equipamentoRepository;
++        this.skillRepository = skillRepository;
++        this.passwordEncoder = passwordEncoder;
++    }
++
++    @Override
++    public void run(ApplicationArguments args) {
++        criarUsuariosDeTeste();
++        liberarAdminGoogle();
++        criarSalas();
++        criarEquipamentos();
++        criarSkills();
++    }
++
++    /** Um usuário por papel, todos da mesma área (o aprovador vê os chamados da sua área). */
++    private void criarUsuariosDeTeste() {
++        if (usuarioRepository.count() > 0) return;
++
++        List<UsuarioEntity> usuarios = List.of(
++                usuario("Usuário Teste", "usuario@helptec.local", UserRole.USER),
++                usuario("Aprovador Teste", "aprovador@helptec.local", UserRole.APROVADOR),
++                usuario("Gerente Teste", "gerente@helptec.local", UserRole.GERENTE),
++                usuario("Suporte Teste", "suporte@helptec.local", UserRole.SUPORTE),
++                usuario("Admin Teste", "admin@helptec.local", UserRole.ADMIN)
++        );
++        usuarioRepository.saveAll(usuarios);
++        log.info("[seed] {} usuários de teste criados (senha: {}). Ex.: admin@helptec.local",
++                usuarios.size(), senhaTeste);
++    }
++
++    /** O login Google só aceita e-mails cadastrados: libera o e-mail informado como ADMIN. */
++    private void liberarAdminGoogle() {
++        if (googleAdminEmail == null || googleAdminEmail.isBlank()) return;
++        String email = googleAdminEmail.trim();
++
++        UsuarioEntity usuario = usuarioRepository.findByEmail(email)
++                .map(u -> (UsuarioEntity) u)
++                .orElseGet(() -> {
++                    UsuarioEntity novo = new UsuarioEntity();
++                    novo.setNome(email.substring(0, email.indexOf('@') > 0 ? email.indexOf('@') : email.length()));
++                    novo.setEmail(email);
++                    // Senha aleatória: esta conta entra pelo Google
++                    novo.setPassword(passwordEncoder.encode(UUID.randomUUID().toString()));
++                    novo.setArea(AREA_TESTE);
++                    return novo;
++                });
++        if (usuario.getRole() != UserRole.ADMIN) {
++            usuario.setRole(UserRole.ADMIN);
++            usuarioRepository.save(usuario);
++            log.info("[seed] {} liberado como ADMIN para o login com Google", email);
++        }
++    }
++
++    private void criarSalas() {
++        if (salasRepository.count() > 0) return;
++        List<String> nomes = List.of("Laboratório 1", "Laboratório 2", "Laboratório 3",
++                "Sala 101", "Sala 102", "Biblioteca", "Secretaria", "Sala dos Professores");
++        salasRepository.saveAll(nomes.stream().map(n -> Salas.builder().nome(n).build()).toList());
++        log.info("[seed] {} salas criadas", nomes.size());
++    }
++
++    private void criarEquipamentos() {
++        if (equipamentoRepository.count() > 0) return;
++        List<Equipamento> equipamentos = List.of(
++                equipamento("Computador Dell OptiPlex", "PAT-0001", "COMPUTADOR", 3500.0),
++                equipamento("Computador Dell OptiPlex", "PAT-0002", "COMPUTADOR", 3500.0),
++                equipamento("Notebook Lenovo ThinkPad", "PAT-0003", "NOTEBOOK", 4200.0),
++                equipamento("Projetor Epson", "PAT-0004", "PROJETOR", 2800.0),
++                equipamento("Impressora HP LaserJet", "PAT-0005", "IMPRESSORA", 1900.0),
++                equipamento("Roteador TP-Link", "PAT-0006", "REDE", 450.0)
++        );
++        equipamentoRepository.saveAll(equipamentos);
++        log.info("[seed] {} equipamentos criados", equipamentos.size());
++    }
++
++    private void criarSkills() {
++        if (skillRepository.count() > 0) return;
++        List<String> nomes = List.of("HARDWARE", "SOFTWARE", "REDE", "IMPRESSORA");
++        skillRepository.saveAll(nomes.stream().map(n -> {
++            Skill s = new Skill();
++            s.setNome(n);
++            return s;
++        }).toList());
++        log.info("[seed] {} skills criadas", nomes.size());
++    }
++
++    private UsuarioEntity usuario(String nome, String email, UserRole role) {
++        return new UsuarioEntity(nome, email, passwordEncoder.encode(senhaTeste), null, role, AREA_TESTE);
++    }
++
++    private Equipamento equipamento(String nome, String patrimonio, String tipo, Double preco) {
++        return Equipamento.builder()
++                .nome(nome)
++                .patrimonio(patrimonio)
++                .status("ATIVO")
++                .tipo(tipo)
++                .preco(preco)
++                .build();
++    }
++}
+diff --git a/src/main/resources/application-local.yaml b/src/main/resources/application-local.yaml
+new file mode 100644
+index 0000000..503a30d
+--- /dev/null
++++ b/src/main/resources/application-local.yaml
+@@ -0,0 +1,35 @@
++# =====================================================================
++# Perfil "local": MongoDB rodando na própria máquina, para testes.
++# Ativar: SPRING_PROFILES_ACTIVE=local (ou "Active profiles: local" no IntelliJ).
++#
++# Subir o MongoDB:  docker compose up -d   (ou instalar o MongoDB Community Server)
++# Na primeira execução o banco é populado com salas, equipamentos, skills e
++# um usuário de teste para cada papel (ver DadosIniciaisLocal).
++# =====================================================================
++spring:
++  mongodb:
++    uri: ${MONGODB_URI_LOCAL:mongodb://localhost:27017}
++    database: ${MONGODB_DATABASE_LOCAL:helptec_local}
++
++  # Sem as chaves do Google o sistema sobe do mesmo jeito; só o login Google pelo navegador
++  # não funciona. O login com e-mail e senha (usuários de teste) funciona normalmente.
++  security:
++    oauth2:
++      client:
++        registration:
++          google:
++            client-id: ${GOOGLE_CLIENT_ID:sem-google-no-local}
++            client-secret: ${GOOGLE_CLIENT_SECRET:sem-google-no-local}
++
++app:
++  seed:
++    enabled: true
++    # Senha dos usuários de teste (só existe no banco local)
++    senha: ${SEED_SENHA:helptec123}
++    # Seu e-mail do Google: vira ADMIN no banco local para o login Google do app funcionar
++    google-admin-email: ${SEED_GOOGLE_ADMIN_EMAIL:}
++
++logging:
++  level:
++    # Mostra no console as consultas feitas ao MongoDB (ajuda a depurar)
++    org.springframework.data.mongodb.core.MongoTemplate: DEBUG
+diff --git a/src/main/resources/application-professor.yaml b/src/main/resources/application-professor.yaml
+new file mode 100644
+index 0000000..ddb2bf1
+--- /dev/null
++++ b/src/main/resources/application-professor.yaml
+@@ -0,0 +1,22 @@
++# =====================================================================
++# Perfil "professor": banco MongoDB (Atlas) disponibilizado pelo professor.
++# Ativar: SPRING_PROFILES_ACTIVE=professor
++#
++# A string de conexão NÃO fica aqui (repositório público). Defina no .env
++# ou nas variáveis de ambiente:
++#   MONGODB_URI=mongodb+srv://<usuario>:<senha>@<cluster>/?retryWrites=true&w=majority
++#   MONGODB_DATABASE=helptec
++# Sem MONGODB_URI o sistema não sobe (de propósito, para não cair no banco local).
++#
++# Atenção: a rede da FIEC pode bloquear a porta 27017 do Atlas; teste com
++#   Test-NetConnection <host-do-cluster> -Port 27017
++# e confira se o seu IP está liberado em Network Access no Atlas.
++# =====================================================================
++spring:
++  mongodb:
++    uri: ${MONGODB_URI}
++    database: ${MONGODB_DATABASE:helptec}
++
++app:
++  seed:
++    enabled: false
+diff --git a/src/main/resources/application.yaml b/src/main/resources/application.yaml
+index 3dbd513..72d228a 100644
+--- a/src/main/resources/application.yaml
++++ b/src/main/resources/application.yaml
+@@ -2,10 +2,16 @@ spring:
+   application:
+     name: ${DB_PROJECT_NAME:helptec}
+ 
++  # Lê variáveis de um arquivo .env na raiz do projeto, se existir (não vai para o Git).
++  # Modelo: .env.example. Variáveis de ambiente do sistema continuam valendo.
++  config:
++    import: optional:file:.env[.properties]
++
+   main:
+     allow-bean-definition-overriding: true
+ 
+   # ===== MongoDB =====
++  # Sem MONGODB_URI usa o MongoDB local (localhost:27017). Ver perfis "local" e "professor".
+   # A string de conexão (com usuário e senha) vem SÓ da variável de ambiente MONGODB_URI.
+   # Nunca coloque a senha aqui: este repositório é público.
+   # Formato: mongodb+srv://<usuario>:<senha>@<cluster>/?retryWrites=true&w=majority
+-- 
+2.43.0
+
