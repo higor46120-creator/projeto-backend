@@ -24,8 +24,8 @@ jobs:
       - name: Dar permissão de execução ao Maven Wrapper
         run: chmod +x mvnw
 
-      - name: Compilar e empacotar projeto
-        run: ./mvnw clean package -DskipTests
+      - name: Compilar e rodar os testes unitários
+        run: ./mvnw clean verify
 
   docker-build:
     runs-on: ubuntu-latest
