@@ -1,0 +1,54 @@
+From ce020d5a3c4b9a72e3e8cf26003489f6435862aa Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Fri, 6 Nov 2026 22:02:17 -0300
+Subject: [PATCH] Corrige ciclo de beans entre MongoTemplate e
+ GeneratedIdCallback
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_012xpyFRPS2vqxyuCv6P8vvC
+---
+ .../fiec/helptec/config/mongo/GeneratedIdCallback.java | 10 +++++++---
+ 1 file changed, 7 insertions(+), 3 deletions(-)
+
+diff --git a/src/main/java/br/edu/fiec/helptec/config/mongo/GeneratedIdCallback.java b/src/main/java/br/edu/fiec/helptec/config/mongo/GeneratedIdCallback.java
+index c44f2a8..f343a62 100644
+--- a/src/main/java/br/edu/fiec/helptec/config/mongo/GeneratedIdCallback.java
++++ b/src/main/java/br/edu/fiec/helptec/config/mongo/GeneratedIdCallback.java
+@@ -1,5 +1,6 @@
+ package br.edu.fiec.helptec.config.mongo;
+ 
++import org.springframework.beans.factory.ObjectProvider;
+ import org.springframework.core.Ordered;
+ import org.springframework.data.mongodb.core.mapping.event.BeforeConvertCallback;
+ import org.springframework.stereotype.Component;
+@@ -12,13 +13,16 @@ import java.util.UUID;
+  * Antes de salvar, preenche os campos anotados com {@link GeneratedId} que ainda estão nulos.
+  * Roda depois da auditoria (ordem maior), para que o documento ainda seja
+  * reconhecido como "novo" e receba createdDate/createdBy.
++ *
++ * O SequenceGeneratorService é obtido de forma preguiçosa (ObjectProvider) para evitar
++ * o ciclo de beans: MongoTemplate -> conversor -> este callback -> serviço -> MongoTemplate.
+  */
+ @Component
+ public class GeneratedIdCallback implements BeforeConvertCallback<Object>, Ordered {
+ 
+-    private final SequenceGeneratorService sequenceGenerator;
++    private final ObjectProvider<SequenceGeneratorService> sequenceGenerator;
+ 
+-    public GeneratedIdCallback(SequenceGeneratorService sequenceGenerator) {
++    public GeneratedIdCallback(ObjectProvider<SequenceGeneratorService> sequenceGenerator) {
+         this.sequenceGenerator = sequenceGenerator;
+     }
+ 
+@@ -36,7 +40,7 @@ public class GeneratedIdCallback implements BeforeConvertCallback<Object>, Order
+         }
+ 
+         if (Long.class.equals(field.getType())) {
+-            ReflectionUtils.setField(field, entity, sequenceGenerator.proximoValor(collection));
++            ReflectionUtils.setField(field, entity, sequenceGenerator.getObject().proximoValor(collection));
+         } else if (UUID.class.equals(field.getType())) {
+             ReflectionUtils.setField(field, entity, UUID.randomUUID());
+         } else {
+-- 
+2.43.0
+

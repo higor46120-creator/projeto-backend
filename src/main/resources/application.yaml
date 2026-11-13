@@ -2,39 +2,28 @@ spring:
   application:
     name: ${DB_PROJECT_NAME:helptec}
 
+  # Lê variáveis de um arquivo .env na raiz do projeto, se existir (não vai para o Git).
+  # Modelo: .env.example. Variáveis de ambiente do sistema continuam valendo.
+  config:
+    import: optional:file:.env[.properties]
+
   main:
     allow-bean-definition-overriding: true
 
-  datasource:
-    # URL de conexão com o banco de dados
-    # Altere 'localhost:3306/nome_do_seu_banco' para os seus dados
-    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3310}/${DB_NAME:helptec}?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true&createDatabaseIfNotExist=true
+  # ===== MongoDB =====
+  # Sem MONGODB_URI usa o MongoDB local (localhost:27017). Ver perfis "local" e "professor".
+  # A string de conexão (com usuário e senha) vem SÓ da variável de ambiente MONGODB_URI.
+  # Nunca coloque a senha aqui: este repositório é público.
+  # Formato: mongodb+srv://<usuario>:<senha>@<cluster>/?retryWrites=true&w=majority
+  mongodb:
+    uri: ${MONGODB_URI:mongodb://localhost:27017}
+    database: ${MONGODB_DATABASE:helptec}
+    representation:
+      uuid: standard               # UUIDs dos usuários gravados no formato padrão (binário subtipo 4)
 
-    # Credenciais de acesso
-    username: ${DB_USER:root}
-    password: ${DB_PASSWORD:1234}
-
-    # Classe do Driver (Opcional a partir do Spring Boot 2.x, mas boa prática manter)
-    driver-class-name: com.mysql.cj.jdbc.Driver
-
-    # Configurações do Pool de Conexões (HikariCP)
-    hikari:
-      pool-name: HikariPool-MySQL
-      maximum-pool-size: 10          # Máximo de conexões ativas simultâneas
-      minimum-idle: 5                # Mínimo de conexões ociosas mantidas no pool
-      idle-timeout: 600000           # Tempo máximo (ms) que uma conexão pode ficar ociosa (10 min)
-      max-lifetime: 1800000          # Vida máxima (ms) de uma conexão no pool (30 min)
-      connection-timeout: 30000      # Tempo máximo (ms) de espera por uma conexão (30 seg)
-
-  # Configurações do Hibernate / JPA (Opcional, mas muito comum)
-  jpa:
-    database-platform: org.hibernate.dialect.MySQLDialect
-    hibernate:
-      ddl-auto: update               # Altere para 'validate' ou 'none' em produção!
-    show-sql: true                   # Exibe os comandos SQL no console (bom para desenvolvimento)
-    properties:
-      hibernate:
-        format_sql: true             # Formata o SQL no console para ficar legível
+  data:
+    mongodb:
+      auto-index-creation: true    # cria os índices únicos (e-mail do usuário, nome da skill, etc.)
 
   security:
     oauth2:
@@ -63,3 +52,13 @@ app:
     redirect-uri: ${FRONTEND_OAUTH2_REDIRECT_URI:http://localhost:3000/oauth2/redirect}
   firebase:
     credentials-json: ${FIREBASE_CREDENTIALS_JSON:}
+    config-file: ${FIREBASE_CONFIG_FILE:}
+    storage-bucket: ${FIREBASE_STORAGE_BUCKET:}
+  google:
+      extra-client-ids: 801876311719-o76pql4jcc9uc5m58qtvp7m7dvq8g6ap.apps.googleusercontent.com
+
+api:
+  security:
+    token:
+      # Chave do JWT em Base64. Gerar com: openssl rand -base64 64
+      secret: ${JWT_SECRET:}

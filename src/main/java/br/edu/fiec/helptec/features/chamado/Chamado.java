@@ -1,6 +1,9 @@
 package br.edu.fiec.helptec.features.chamado;
 
-import jakarta.persistence.*;
+import br.edu.fiec.helptec.config.mongo.GeneratedId;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.mapping.Document;
+
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -9,8 +12,7 @@ import lombok.NoArgsConstructor;
 import java.time.LocalDate;
 import java.util.UUID;
 
-@Entity
-@Table(name = "tb_chamado")
+@Document(collection = "chamados")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
@@ -18,7 +20,7 @@ import java.util.UUID;
 public class Chamado {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @GeneratedId
     private Long idChamado;
 
     private UUID idUsuario;   // solicitante
@@ -27,7 +29,6 @@ public class Chamado {
 
     private String descricao;
 
-    @Enumerated(EnumType.STRING)
     private StatusChamado status;
 
     private String prioridade;

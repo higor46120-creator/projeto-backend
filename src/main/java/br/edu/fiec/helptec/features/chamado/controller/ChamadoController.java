@@ -49,11 +49,16 @@ public class ChamadoController {
     // a partir do campo idAprovador do usuário solicitante.
     @PostMapping
     public ResponseEntity<ChamadoDTO> criar(@RequestBody ChamadoDTO dto) {
+        UsuarioEntity solicitante = UserContext.getUser();
+        if (solicitante == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        dto.setIdUsuario(solicitante.getId());
         return ResponseEntity.status(HttpStatus.CREATED).body(chamadoService.criar(dto));
     }
 
     // Aprovador designado aprova o chamado
-    @PreAuthorize("hasRole('APROVADOR')")
+    @PreAuthorize("hasAnyRole('APROVADOR', 'ADMIN')")
     @PatchMapping("/{id}/aprovar")
     public ResponseEntity<ChamadoDTO> aprovar(
             @PathVariable Long id
@@ -62,6 +67,7 @@ public class ChamadoController {
     }
 
     // Aprovador designado reprova o chamado
+    @PreAuthorize("hasAnyRole('APROVADOR', 'ADMIN')")
     @PatchMapping("/{id}/reprovar")
     public ResponseEntity<ChamadoDTO> reprovar(
             @PathVariable Long id,
@@ -72,6 +78,7 @@ public class ChamadoController {
 
     // Gerente triado: aloca um usuário de suporte (previamente filtrado por skill
     // via GET /api/skills/{idSkill}/suportes) ao chamado já aprovado
+    @PreAuthorize("hasAnyRole('GERENTE', 'ADMIN')")
     @PatchMapping("/{id}/triagem")
     public ResponseEntity<ChamadoDTO> triar(
             @PathVariable Long id,
@@ -81,6 +88,7 @@ public class ChamadoController {
     }
 
     // Suporte finaliza o atendimento
+    @PreAuthorize("hasAnyRole('SUPORTE', 'ADMIN')")
     @PatchMapping("/{id}/resolver")
     public ResponseEntity<ChamadoDTO> resolver(
             @PathVariable Long id,
@@ -89,6 +97,7 @@ public class ChamadoController {
         return ResponseEntity.ok(chamadoService.resolver(id, resolucao));
     }
 
+    @PreAuthorize("hasRole('ADMIN')")
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deletar(@PathVariable Long id) {
         chamadoService.deletar(id);
@@ -124,6 +133,7 @@ public class ChamadoController {
     ) throws IOException {
         return ResponseEntity.status(HttpStatus.CREATED).body(chamadoAnexoService.uploadComThumbnail(id, file));
     }
+    @PreAuthorize("hasAnyRole('GERENTE', 'ADMIN')")
     @PostMapping(value = "/csv", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<List<ChamadoDTO>> criarViaCsv(
             @RequestPart("file") MultipartFile file

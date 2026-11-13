@@ -5,12 +5,17 @@ import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
+import jakarta.annotation.PostConstruct;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.stereotype.Service;
 
 import javax.crypto.SecretKey;
+import java.security.SecureRandom;
+import java.util.Base64;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
@@ -19,13 +24,27 @@ import java.util.function.Function;
 @Service
 public class JwtService {
 
-    // Chave secreta configurada no application.properties
-    // Exemplo: api.security.token.secret=404E635266556A586E3272357538782F413F4428472B4B6250655368566D5971
-    @Value("${api.security.token.secret:404E635266556A586E3272357538782F413F4428472B4B6250655368566D5971}")
+    private static final Logger log = LoggerFactory.getLogger(JwtService.class);
+
+    // Chave secreta em Base64 (mínimo 32 bytes), vinda da variável de ambiente JWT_SECRET.
+    // Gerar uma: openssl rand -base64 64
+    // NUNCA colocar uma chave fixa no código: o repositório é público.
+    @Value("${api.security.token.secret:}")
     private String secretKey;
 
     @Value("${api.security.token.expiration-ms:86400000}") // 24 horas em milissegundos
     private long jwtExpirationMs;
+
+    @PostConstruct
+    void validarChave() {
+        if (secretKey == null || secretKey.isBlank()) {
+            byte[] aleatoria = new byte[64];
+            new SecureRandom().nextBytes(aleatoria);
+            secretKey = Base64.getEncoder().encodeToString(aleatoria);
+            log.warn("JWT_SECRET não definido: usando chave aleatória temporária. "
+                    + "Os tokens deixam de valer quando a aplicação reinicia. Defina JWT_SECRET em produção.");
+        }
+    }
 
     // Extrai o username (e-mail) do token
     public String extractUsername(String token) {

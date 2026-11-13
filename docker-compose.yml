@@ -1,0 +1,29 @@
+# MongoDB local para testes (perfil "local").
+#   Subir:   docker compose up -d
+#   Parar:   docker compose down        (os dados ficam no volume)
+#   Zerar:   docker compose down -v     (apaga o banco; o seed roda de novo)
+# Interface web do banco: http://localhost:8081
+services:
+  mongodb:
+    image: mongo:7
+    container_name: helptec-mongodb
+    ports:
+      - "27017:27017"
+    volumes:
+      - helptec-mongo-data:/data/db
+    restart: unless-stopped
+
+  mongo-express:
+    image: mongo-express:1
+    container_name: helptec-mongo-express
+    ports:
+      - "8081:8081"
+    environment:
+      ME_CONFIG_MONGODB_URL: mongodb://mongodb:27017/
+      ME_CONFIG_BASICAUTH: "false"
+    depends_on:
+      - mongodb
+    restart: unless-stopped
+
+volumes:
+  helptec-mongo-data:

@@ -58,9 +58,8 @@ public class UsuarioServiceImpl implements UsuarioService {
 
         return new PageResponseDTO<>(
                 conteudo,
-                page.getNumber(),
-                page.getSize(),
                 page.getTotalElements(),
+                page.getNumber(),
                 page.getTotalPages()
         );
     }
