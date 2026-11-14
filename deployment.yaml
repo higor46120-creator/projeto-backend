@@ -6,6 +6,8 @@ data:
   DB_PROJECT_NAME: "helptec"
   # Nome do banco dentro do cluster MongoDB Atlas
   MONGODB_DATABASE: "helptec"
+  # Endereço do site (front) que pode chamar a API. TROQUE pelo domínio de vocês.
+  CORS_ALLOWED_ORIGINS: "https://helptec.SEU-DOMINIO"
   # Troque pelo bucket do seu projeto (Firebase Console > Storage)
   FIREBASE_STORAGE_BUCKET: "SEU-PROJETO.firebasestorage.app"
 
@@ -142,3 +144,40 @@ spec:
       port: 80
       targetPort: 80
       nodePort: 30081
+
+---
+# Entrada pelo domínio com https (o Google só aceita https ou localhost).
+# No minikube, ative antes:  minikube addons enable ingress
+# Certificado:  kubectl create secret tls helptech-tls --cert=certificado.crt --key=chave.key
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: helptech-ingress
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - helptec.SEU-DOMINIO       # TROQUE
+        - api.helptec.SEU-DOMINIO   # TROQUE
+      secretName: helptech-tls
+  rules:
+    - host: helptec.SEU-DOMINIO     # TROQUE
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: helptech-frontend-service
+                port:
+                  number: 80
+    - host: api.helptec.SEU-DOMINIO # TROQUE
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: helptech-backend-service
+                port:
+                  number: 8080

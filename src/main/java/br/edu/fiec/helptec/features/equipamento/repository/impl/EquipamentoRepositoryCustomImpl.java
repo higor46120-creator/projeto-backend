@@ -31,12 +31,15 @@ public class EquipamentoRepositoryCustomImpl implements EquipamentoRepositoryCus
         List<Criteria> filtros = new ArrayList<>();
 
         if (filtro != null) {
-            // Busca geral: nome OU patrimônio OU status
+            // Busca geral: nome, patrimônio, status, tipo, área ou descrição
             if (preenchido(filtro.getTermo())) {
                 filtros.add(new Criteria().orOperator(
                         contem("nome", filtro.getTermo()),
                         contem("patrimonio", filtro.getTermo()),
-                        contem("status", filtro.getTermo())
+                        contem("status", filtro.getTermo()),
+                        contem("tipo", filtro.getTermo()),
+                        contem("area", filtro.getTermo()),
+                        contem("descricao", filtro.getTermo())
                 ));
             }
 
@@ -52,6 +55,12 @@ public class EquipamentoRepositoryCustomImpl implements EquipamentoRepositoryCus
             }
             if (preenchido(filtro.getTipo())) {
                 filtros.add(contem("tipo", filtro.getTipo()));
+            }
+            if (preenchido(filtro.getArea())) {
+                filtros.add(contem("area", filtro.getArea()));
+            }
+            if (filtro.getIdSala() != null) {
+                filtros.add(Criteria.where("idSala").is(filtro.getIdSala()));
             }
 
             // Faixa de preço (os dois limites no mesmo critério, como o Mongo exige)

@@ -32,7 +32,8 @@ class EquipamentoServiceTest {
     private EquipamentoService equipamentoService;
 
     private static Equipamento equipamento(Long id) {
-        return new Equipamento(id, "Projetor Epson", "PAT-0004", "ATIVO", "PROJETOR", 2800.0);
+        return new Equipamento(id, "Projetor Epson", "PAT-0004", "OPERACIONAL", "PROJETOR", 2800.0,
+                "Informática", 1L, "Projetor do laboratório");
     }
 
     @Test
@@ -45,7 +46,8 @@ class EquipamentoServiceTest {
             e.setId(7L);
             return e;
         });
-        EquipamentoDTO dto = new EquipamentoDTO(55L, "Notebook", "PAT-9", "ATIVO", "NOTEBOOK", 4200.0);
+        EquipamentoDTO dto = new EquipamentoDTO(55L, "Notebook", "PAT-9", "OPERACIONAL", "NOTEBOOK", 4200.0,
+                "Secretaria", 2L, "Notebook da secretaria");
 
         //impl
         EquipamentoDTO resultado = equipamentoService.criar(dto);
@@ -61,7 +63,8 @@ class EquipamentoServiceTest {
         //mocks
         when(equipamentoRepository.findById(4L)).thenReturn(Optional.of(equipamento(4L)));
         when(equipamentoRepository.save(any(Equipamento.class))).thenAnswer(inv -> inv.getArgument(0));
-        EquipamentoDTO novo = new EquipamentoDTO(null, "Projetor BenQ", "PAT-0040", "MANUTENCAO", "PROJETOR", 3100.0);
+        EquipamentoDTO novo = new EquipamentoDTO(null, "Projetor BenQ", "PAT-0040", "MANUTENCAO", "PROJETOR", 3100.0,
+                "Biblioteca", 6L, "Lâmpada trocada");
 
         //impl
         EquipamentoDTO resultado = equipamentoService.atualizar(4L, novo);
@@ -73,8 +76,26 @@ class EquipamentoServiceTest {
                 () -> assertEquals("PAT-0040", resultado.getPatrimonio()),
                 () -> assertEquals("MANUTENCAO", resultado.getStatus()),
                 () -> assertEquals("PROJETOR", resultado.getTipo()),
-                () -> assertEquals(Double.valueOf(3100.0), resultado.getPreco())
+                () -> assertEquals(Double.valueOf(3100.0), resultado.getPreco()),
+                () -> assertEquals("Biblioteca", resultado.getArea()),
+                () -> assertEquals(Long.valueOf(6L), resultado.getIdSala()),
+                () -> assertEquals("Lâmpada trocada", resultado.getDescricao())
         );
+    }
+
+    @Test
+    @DisplayName("sem status informado, o equipamento começa OPERACIONAL")
+    void deveUsarStatusPadrao() {
+        //mocks
+        when(equipamentoRepository.save(any(Equipamento.class))).thenAnswer(inv -> inv.getArgument(0));
+        EquipamentoDTO dto = new EquipamentoDTO(null, null, "PAT-77", " ", "COMPUTADOR", null,
+                "Laboratório", 1L, null);
+
+        //impl
+        EquipamentoDTO resultado = equipamentoService.criar(dto);
+
+        //asserts
+        assertEquals("OPERACIONAL", resultado.getStatus());
     }
 
     @Test

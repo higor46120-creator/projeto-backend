@@ -1,6 +1,6 @@
 package br.edu.fiec.helptec.config;
 
-import com.google.firebase.internal.NonNull;
+import org.jspecify.annotations.NonNull;
 import io.jsonwebtoken.JwtException;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;

@@ -1,0 +1,169 @@
+From 66f11267ab481dcbd08c538231334fedeb6b750c Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sat, 14 Nov 2026 11:08:45 -0300
+Subject: [PATCH] Rota para o suporte iniciar o atendimento (PATCH
+ /api/chamados/{id}/iniciar)
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+O suporte logado assume um chamado aprovado, que passa para EM_ATENDIMENTO.
+A triagem do gerente continua igual. Testes de serviço e de controller.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_012xpyFRPS2vqxyuCv6P8vvC
+---
+ .../chamado/controller/ChamadoController.java | 12 +++++
+ .../chamado/service/ChamadoService.java       | 17 +++++++
+ .../controller/ChamadoControllerTest.java     | 23 +++++++++
+ .../chamado/service/ChamadoServiceTest.java   | 49 +++++++++++++++++++
+ 4 files changed, 101 insertions(+)
+
+diff --git a/src/main/java/br/edu/fiec/helptec/features/chamado/controller/ChamadoController.java b/src/main/java/br/edu/fiec/helptec/features/chamado/controller/ChamadoController.java
+index 75aee31..0713ea4 100644
+--- a/src/main/java/br/edu/fiec/helptec/features/chamado/controller/ChamadoController.java
++++ b/src/main/java/br/edu/fiec/helptec/features/chamado/controller/ChamadoController.java
+@@ -87,6 +87,18 @@ public class ChamadoController {
+         return ResponseEntity.ok(chamadoService.triar(id, request.getIdSuporte()));
+     }
+ 
++    // Suporte assume o chamado aprovado ("Iniciar Atendimento" na tela do suporte).
++    // Diferente da triagem: aqui o suporte é sempre o próprio usuário logado.
++    @PreAuthorize("hasAnyRole('SUPORTE', 'ADMIN')")
++    @PatchMapping("/{id}/iniciar")
++    public ResponseEntity<ChamadoDTO> iniciarAtendimento(@PathVariable Long id) {
++        UsuarioEntity suporte = UserContext.getUser();
++        if (suporte == null) {
++            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
++        }
++        return ResponseEntity.ok(chamadoService.iniciarAtendimento(id, suporte));
++    }
++
+     // Suporte finaliza o atendimento
+     @PreAuthorize("hasAnyRole('SUPORTE', 'ADMIN')")
+     @PatchMapping("/{id}/resolver")
+diff --git a/src/main/java/br/edu/fiec/helptec/features/chamado/service/ChamadoService.java b/src/main/java/br/edu/fiec/helptec/features/chamado/service/ChamadoService.java
+index ff6d3b7..8e22ccb 100644
+--- a/src/main/java/br/edu/fiec/helptec/features/chamado/service/ChamadoService.java
++++ b/src/main/java/br/edu/fiec/helptec/features/chamado/service/ChamadoService.java
+@@ -145,6 +145,23 @@ public class ChamadoService {
+         return toDTO(chamadoRepository.save(chamado));
+     }
+ 
++    // ---------------------------------------------------------
++    // 3b. Suporte assume um chamado aprovado ("Iniciar Atendimento"):
++    //     o próprio usuário logado vira o suporte do chamado
++    // ---------------------------------------------------------
++    public ChamadoDTO iniciarAtendimento(Long idChamado, UsuarioEntity suporte) {
++        Chamado chamado = buscarOuFalhar(idChamado);
++        validarStatus(chamado, StatusChamado.APROVADO);
++
++        if (suporte.getRole() != UserRole.SUPORTE && suporte.getRole() != UserRole.ADMIN) {
++            throw new IllegalStateException("Só usuários de suporte podem iniciar o atendimento");
++        }
++
++        chamado.setIdSuporte(suporte.getId());
++        chamado.setStatus(StatusChamado.EM_ATENDIMENTO);
++        return toDTO(chamadoRepository.save(chamado));
++    }
++
+     // ---------------------------------------------------------
+     // 4. Suporte resolve o chamado
+     // ---------------------------------------------------------
+diff --git a/src/test/java/br/edu/fiec/helptec/features/chamado/controller/ChamadoControllerTest.java b/src/test/java/br/edu/fiec/helptec/features/chamado/controller/ChamadoControllerTest.java
+index 02cd29e..c38d2fd 100644
+--- a/src/test/java/br/edu/fiec/helptec/features/chamado/controller/ChamadoControllerTest.java
++++ b/src/test/java/br/edu/fiec/helptec/features/chamado/controller/ChamadoControllerTest.java
+@@ -130,6 +130,29 @@ class ChamadoControllerTest {
+                 .andExpect(jsonPath("$.status").value("APROVADO"));
+     }
+ 
++    @Test
++    @DisplayName("PATCH /iniciar usa o suporte logado")
++    void deveIniciarAtendimentoComUsuarioLogado() throws Exception {
++        //mocks
++        UsuarioEntity suporte = Fabrica.usuario(UserRole.SUPORTE);
++        UserContext.setUser(suporte);
++        when(chamadoService.iniciarAtendimento(1L, suporte)).thenReturn(dto(1L, StatusChamado.EM_ATENDIMENTO));
++
++        //impl + asserts
++        mockMvc.perform(patch("/api/chamados/1/iniciar"))
++                .andExpect(status().isOk())
++                .andExpect(jsonPath("$.status").value("EM_ATENDIMENTO"));
++    }
++
++    @Test
++    @DisplayName("PATCH /iniciar sem usuário logado devolve 401")
++    void naoDeveIniciarSemUsuarioLogado() throws Exception {
++        //impl + asserts
++        mockMvc.perform(patch("/api/chamados/1/iniciar"))
++                .andExpect(status().isUnauthorized());
++        verify(chamadoService, never()).iniciarAtendimento(any(), any());
++    }
++
+     @Test
+     @DisplayName("PATCH /triagem repassa o suporte escolhido")
+     void deveTriar() throws Exception {
+diff --git a/src/test/java/br/edu/fiec/helptec/features/chamado/service/ChamadoServiceTest.java b/src/test/java/br/edu/fiec/helptec/features/chamado/service/ChamadoServiceTest.java
+index 5c11d5b..a117873 100644
+--- a/src/test/java/br/edu/fiec/helptec/features/chamado/service/ChamadoServiceTest.java
++++ b/src/test/java/br/edu/fiec/helptec/features/chamado/service/ChamadoServiceTest.java
+@@ -302,6 +302,55 @@ class ChamadoServiceTest {
+         }
+     }
+ 
++    @Nested
++    @DisplayName("Iniciar atendimento (suporte assume)")
++    class IniciarAtendimento {
++
++        @Test
++        @DisplayName("o suporte logado assume o chamado aprovado")
++        void deveIniciarAtendimento() {
++            //mocks
++            UsuarioEntity suporte = Fabrica.usuario(UserRole.SUPORTE);
++            when(chamadoRepository.findById(ID_CHAMADO))
++                    .thenReturn(Optional.of(Fabrica.chamado(ID_CHAMADO, ID_SOLICITANTE, StatusChamado.APROVADO)));
++            saveDevolveOMesmoObjeto();
++
++            //impl
++            ChamadoDTO resultado = chamadoService.iniciarAtendimento(ID_CHAMADO, suporte);
++
++            //asserts
++            assertEquals(StatusChamado.EM_ATENDIMENTO, resultado.getStatus());
++            assertEquals(suporte.getId(), resultado.getIdSuporte());
++            assertEquals(ID_SOLICITANTE, resultado.getIdUsuario(), "o solicitante não muda");
++        }
++
++        @Test
++        @DisplayName("quem não é do suporte não pode iniciar")
++        void naoDeveIniciarSemPapelSuporte() {
++            //mocks
++            when(chamadoRepository.findById(ID_CHAMADO))
++                    .thenReturn(Optional.of(Fabrica.chamado(ID_CHAMADO, ID_SOLICITANTE, StatusChamado.APROVADO)));
++
++            //impl + asserts
++            assertThrows(IllegalStateException.class,
++                    () -> chamadoService.iniciarAtendimento(ID_CHAMADO, Fabrica.usuario(UserRole.GERENTE)));
++            verify(chamadoRepository, never()).save(any());
++        }
++
++        @Test
++        @DisplayName("não inicia chamado que ainda não foi aprovado")
++        void naoDeveIniciarChamadoNaoAprovado() {
++            //mocks
++            when(chamadoRepository.findById(ID_CHAMADO))
++                    .thenReturn(Optional.of(Fabrica.chamado(ID_CHAMADO, ID_SOLICITANTE, StatusChamado.AGUARDANDO_APROVACAO)));
++
++            //impl + asserts
++            assertThrows(IllegalStateException.class,
++                    () -> chamadoService.iniciarAtendimento(ID_CHAMADO, Fabrica.usuario(UserRole.SUPORTE)));
++            verify(chamadoRepository, never()).save(any());
++        }
++    }
++
+     @Nested
+     @DisplayName("Resolução")
+     class Resolucao {
+-- 
+2.43.0
+

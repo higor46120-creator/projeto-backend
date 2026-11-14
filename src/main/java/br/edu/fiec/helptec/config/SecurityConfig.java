@@ -111,10 +111,18 @@ public class SecurityConfig {
         return http.build();
     }
 
+    // Endereços do front que podem chamar a API, separados por vírgula
+    // (CORS_ALLOWED_ORIGINS). "*" libera qualquer endereço.
+    @Value("${app.cors.allowed-origins:*}")
+    private String allowedOrigins;
+
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(List.of("*"));
+        configuration.setAllowedOriginPatterns(java.util.Arrays.stream(allowedOrigins.split(","))
+                .map(String::trim)
+                .filter(origem -> !origem.isEmpty())
+                .toList());
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
         configuration.setAllowedHeaders(List.of("*"));
         configuration.setAllowCredentials(false);

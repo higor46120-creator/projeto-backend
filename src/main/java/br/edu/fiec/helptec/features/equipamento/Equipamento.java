@@ -25,4 +25,8 @@ public class Equipamento extends AuditBaseEntity {
     private String tipo;//tipo
     private Double preco;
 
+    // Campos da tela de equipamentos do front (Suporte)
+    private String area;      // setor/área onde o equipamento fica
+    private Long idSala;      // sala onde o equipamento está
+    private String descricao;
 }

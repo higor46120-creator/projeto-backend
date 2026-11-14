@@ -110,6 +110,51 @@ class ChamadoServiceTest {
         }
 
         @Test
+        @DisplayName("aceita sala e equipamento digitados quando não estão cadastrados")
+        void deveAceitarSalaEEquipamentoDigitados() {
+            //mocks
+            when(usuarioRepository.findById(ID_SOLICITANTE))
+                    .thenReturn(Optional.of(Fabrica.usuario(ID_SOLICITANTE, UserRole.USER)));
+            saveDevolveOMesmoObjeto();
+            ChamadoDTO dto = new ChamadoDTO();
+            dto.setIdUsuario(ID_SOLICITANTE);
+            dto.setDescricao("Projetor sem imagem");
+            dto.setSalaInformada("  Laboratório 7  ");
+            dto.setEquipamentoInformado("PC do professor");
+
+            //impl
+            ChamadoDTO resultado = chamadoService.criar(dto);
+
+            //asserts
+            assertNull(resultado.getIdSala());
+            assertNull(resultado.getIdEquipamento());
+            assertEquals("Laboratório 7", resultado.getSalaInformada(), "o texto é guardado sem espaços nas pontas");
+            assertEquals("PC do professor", resultado.getEquipamentoInformado());
+        }
+
+        @Test
+        @DisplayName("quando a sala existe no cadastro, o texto digitado é descartado")
+        void devePriorizarCadastroSobreTextoDigitado() {
+            //mocks
+            when(usuarioRepository.findById(ID_SOLICITANTE))
+                    .thenReturn(Optional.of(Fabrica.usuario(ID_SOLICITANTE, UserRole.USER)));
+            saveDevolveOMesmoObjeto();
+            ChamadoDTO dto = new ChamadoDTO();
+            dto.setIdUsuario(ID_SOLICITANTE);
+            dto.setIdSala(3L);
+            dto.setSalaInformada("Sala 101");
+            dto.setEquipamentoInformado("   ");
+
+            //impl
+            ChamadoDTO resultado = chamadoService.criar(dto);
+
+            //asserts
+            assertEquals(Long.valueOf(3L), resultado.getIdSala());
+            assertNull(resultado.getSalaInformada());
+            assertNull(resultado.getEquipamentoInformado(), "texto em branco vira null");
+        }
+
+        @Test
         @DisplayName("não deve abrir chamado de solicitante inexistente")
         void naoDeveCriarChamadoSemSolicitante() {
             //mocks
@@ -254,6 +299,55 @@ class ChamadoServiceTest {
             //impl + asserts
             assertThrows(IllegalStateException.class, () -> chamadoService.triar(ID_CHAMADO, UUID.randomUUID()));
             verify(usuarioRepository, never()).findById(any());
+        }
+    }
+
+    @Nested
+    @DisplayName("Iniciar atendimento (suporte assume)")
+    class IniciarAtendimento {
+
+        @Test
+        @DisplayName("o suporte logado assume o chamado aprovado")
+        void deveIniciarAtendimento() {
+            //mocks
+            UsuarioEntity suporte = Fabrica.usuario(UserRole.SUPORTE);
+            when(chamadoRepository.findById(ID_CHAMADO))
+                    .thenReturn(Optional.of(Fabrica.chamado(ID_CHAMADO, ID_SOLICITANTE, StatusChamado.APROVADO)));
+            saveDevolveOMesmoObjeto();
+
+            //impl
+            ChamadoDTO resultado = chamadoService.iniciarAtendimento(ID_CHAMADO, suporte);
+
+            //asserts
+            assertEquals(StatusChamado.EM_ATENDIMENTO, resultado.getStatus());
+            assertEquals(suporte.getId(), resultado.getIdSuporte());
+            assertEquals(ID_SOLICITANTE, resultado.getIdUsuario(), "o solicitante não muda");
+        }
+
+        @Test
+        @DisplayName("quem não é do suporte não pode iniciar")
+        void naoDeveIniciarSemPapelSuporte() {
+            //mocks
+            when(chamadoRepository.findById(ID_CHAMADO))
+                    .thenReturn(Optional.of(Fabrica.chamado(ID_CHAMADO, ID_SOLICITANTE, StatusChamado.APROVADO)));
+
+            //impl + asserts
+            assertThrows(IllegalStateException.class,
+                    () -> chamadoService.iniciarAtendimento(ID_CHAMADO, Fabrica.usuario(UserRole.GERENTE)));
+            verify(chamadoRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("não inicia chamado que ainda não foi aprovado")
+        void naoDeveIniciarChamadoNaoAprovado() {
+            //mocks
+            when(chamadoRepository.findById(ID_CHAMADO))
+                    .thenReturn(Optional.of(Fabrica.chamado(ID_CHAMADO, ID_SOLICITANTE, StatusChamado.AGUARDANDO_APROVACAO)));
+
+            //impl + asserts
+            assertThrows(IllegalStateException.class,
+                    () -> chamadoService.iniciarAtendimento(ID_CHAMADO, Fabrica.usuario(UserRole.SUPORTE)));
+            verify(chamadoRepository, never()).save(any());
         }
     }
 

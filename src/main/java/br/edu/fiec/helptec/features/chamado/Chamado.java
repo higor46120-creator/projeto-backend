@@ -39,4 +39,9 @@ public class Chamado {
 
     private Long idEquipamento;
     private Long idSala;
+
+    // Texto digitado pelo usuário quando a sala/equipamento não está cadastrado.
+    // Nesse caso idSala/idEquipamento ficam nulos (o cadastro tem prioridade).
+    private String salaInformada;
+    private String equipamentoInformado;
 }
