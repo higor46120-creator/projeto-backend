@@ -1,22 +1,25 @@
 package br.edu.fiec.helptec.features.skill;
 
-import jakarta.persistence.*;
+import br.edu.fiec.helptec.config.mongo.GeneratedId;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.mapping.Document;
+import org.springframework.data.mongodb.core.index.Indexed;
+
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
 // Catálogo de skills existentes (ex: REDE, HARDWARE, SOFTWARE, IMPRESSORA...)
-@Entity
-@Table(name = "tb_skill")
+@Document(collection = "skills")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 public class Skill {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @GeneratedId
     private Long idSkill;
 
-    @Column(nullable = false, unique = true)
+    @Indexed(unique = true)
     private String nome;
 }

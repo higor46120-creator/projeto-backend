@@ -1,14 +1,14 @@
 package br.edu.fiec.helptec.features.skill.repository;
 
 import br.edu.fiec.helptec.features.skill.UsuarioSkill;
-import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
 import java.util.UUID;
 
 @Repository
-public interface UsuarioSkillRepository extends JpaRepository<UsuarioSkill, Long> {
+public interface UsuarioSkillRepository extends MongoRepository<UsuarioSkill, Long> {
 
     List<UsuarioSkill> findByIdUsuario(UUID idUsuario);
 

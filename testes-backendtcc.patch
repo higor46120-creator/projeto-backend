@@ -1,0 +1,1719 @@
+From cda37f68d01114ef6031c5fc5fb1ad68b5974ddd Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Thu, 12 Nov 2026 21:27:58 -0300
+Subject: [PATCH] =?UTF-8?q?Testes=20unit=C3=A1rios=20(JUnit=205=20+=20Mock?=
+ =?UTF-8?q?ito=20+=20MockMvc)=20e=20cobertura=20com=20JaCoCo?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+- Serviços: chamado (fluxo completo), salas, equipamentos, skills,
+  usuários, autenticação e JWT
+- Controllers de salas e chamados com MockMvc standalone
+- Teste de contexto vira integração opcional (-Dintegracao=true)
+- Corrige aprovação: o solicitante era trocado pelo aprovador
+- Corrige PageResponseDTO: a paginação de usuários voltava vazia
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_012xpyFRPS2vqxyuCv6P8vvC
+---
+ pom.xml                                       |  21 ++
+ .../chamado/service/ChamadoService.java       |   2 +-
+ .../features/commons/PageResponseDTO.java     |   4 -
+ .../service/impl/UsuarioServiceImpl.java      |   3 +-
+ .../fiec/helptec/HelptecApplicationTests.java |   8 +
+ .../fiec/helptec/config/JwtServiceTest.java   |  94 +++++
+ .../auth/service/AuthServiceImplTest.java     | 180 +++++++++
+ .../controller/ChamadoControllerTest.java     | 170 +++++++++
+ .../chamado/service/ChamadoServiceTest.java   | 356 ++++++++++++++++++
+ .../service/EquipamentoServiceTest.java       | 103 +++++
+ .../salas/controller/SalasControllerTest.java | 116 ++++++
+ .../salas/service/SalasServiceTest.java       | 144 +++++++
+ .../skill/service/SkillServiceTest.java       | 156 ++++++++
+ .../service/UsuarioServiceImplTest.java       | 139 +++++++
+ .../br/edu/fiec/helptec/support/Fabrica.java  |  51 +++
+ 15 files changed, 1540 insertions(+), 7 deletions(-)
+ create mode 100644 src/test/java/br/edu/fiec/helptec/config/JwtServiceTest.java
+ create mode 100644 src/test/java/br/edu/fiec/helptec/features/auth/service/AuthServiceImplTest.java
+ create mode 100644 src/test/java/br/edu/fiec/helptec/features/chamado/controller/ChamadoControllerTest.java
+ create mode 100644 src/test/java/br/edu/fiec/helptec/features/chamado/service/ChamadoServiceTest.java
+ create mode 100644 src/test/java/br/edu/fiec/helptec/features/equipamento/service/EquipamentoServiceTest.java
+ create mode 100644 src/test/java/br/edu/fiec/helptec/features/salas/controller/SalasControllerTest.java
+ create mode 100644 src/test/java/br/edu/fiec/helptec/features/salas/service/SalasServiceTest.java
+ create mode 100644 src/test/java/br/edu/fiec/helptec/features/skill/service/SkillServiceTest.java
+ create mode 100644 src/test/java/br/edu/fiec/helptec/features/usuario/service/UsuarioServiceImplTest.java
+ create mode 100644 src/test/java/br/edu/fiec/helptec/support/Fabrica.java
+
+diff --git a/pom.xml b/pom.xml
+index c3aa086..05a0a79 100644
+--- a/pom.xml
++++ b/pom.xml
+@@ -173,6 +173,27 @@
+ 					</execution>
+ 				</executions>
+ 			</plugin>
++			<!-- Cobertura de testes: ./mvnw test  ->  target/site/jacoco/index.html -->
++			<plugin>
++				<groupId>org.jacoco</groupId>
++				<artifactId>jacoco-maven-plugin</artifactId>
++				<version>0.8.13</version>
++				<executions>
++					<execution>
++						<id>preparar-agente</id>
++						<goals>
++							<goal>prepare-agent</goal>
++						</goals>
++					</execution>
++					<execution>
++						<id>relatorio</id>
++						<phase>test</phase>
++						<goals>
++							<goal>report</goal>
++						</goals>
++					</execution>
++				</executions>
++			</plugin>
+ 		</plugins>
+ 	</build>
+ 
+diff --git a/src/main/java/br/edu/fiec/helptec/features/chamado/service/ChamadoService.java b/src/main/java/br/edu/fiec/helptec/features/chamado/service/ChamadoService.java
+index febde78..bf6a18b 100644
+--- a/src/main/java/br/edu/fiec/helptec/features/chamado/service/ChamadoService.java
++++ b/src/main/java/br/edu/fiec/helptec/features/chamado/service/ChamadoService.java
+@@ -106,7 +106,7 @@ public class ChamadoService {
+     public ChamadoDTO aprovar(Long idChamado, UUID idUsuarioLogado) {
+         Chamado chamado = buscarOuFalhar(idChamado);
+         validarStatus(chamado, StatusChamado.AGUARDANDO_APROVACAO);
+-        chamado.setIdUsuario(idUsuarioLogado);
++        // idUsuario continua sendo o solicitante; não sobrescrever com o aprovador
+         chamado.setStatus(StatusChamado.APROVADO);
+         return toDTO(chamadoRepository.save(chamado));
+     }
+diff --git a/src/main/java/br/edu/fiec/helptec/features/commons/PageResponseDTO.java b/src/main/java/br/edu/fiec/helptec/features/commons/PageResponseDTO.java
+index f66acfe..5199338 100644
+--- a/src/main/java/br/edu/fiec/helptec/features/commons/PageResponseDTO.java
++++ b/src/main/java/br/edu/fiec/helptec/features/commons/PageResponseDTO.java
+@@ -1,6 +1,5 @@
+ package br.edu.fiec.helptec.features.commons;
+ 
+-import br.edu.fiec.helptec.features.usuario.model.dto.UsuarioResponseDTO;
+ import lombok.AllArgsConstructor;
+ import lombok.Data;
+ import lombok.NoArgsConstructor;
+@@ -15,7 +14,4 @@ public class PageResponseDTO<T> {
+     private long totalItens;
+     private int paginaAtual;
+     private int totalPaginas;
+-
+-    public PageResponseDTO(List<UsuarioResponseDTO> conteudo, int number, int size, long totalElements, int totalPages) {
+-    }
+ }
+diff --git a/src/main/java/br/edu/fiec/helptec/features/usuario/service/impl/UsuarioServiceImpl.java b/src/main/java/br/edu/fiec/helptec/features/usuario/service/impl/UsuarioServiceImpl.java
+index 1c54cd6..d059d6b 100644
+--- a/src/main/java/br/edu/fiec/helptec/features/usuario/service/impl/UsuarioServiceImpl.java
++++ b/src/main/java/br/edu/fiec/helptec/features/usuario/service/impl/UsuarioServiceImpl.java
+@@ -58,9 +58,8 @@ public class UsuarioServiceImpl implements UsuarioService {
+ 
+         return new PageResponseDTO<>(
+                 conteudo,
+-                page.getNumber(),
+-                page.getSize(),
+                 page.getTotalElements(),
++                page.getNumber(),
+                 page.getTotalPages()
+         );
+     }
+diff --git a/src/test/java/br/edu/fiec/helptec/HelptecApplicationTests.java b/src/test/java/br/edu/fiec/helptec/HelptecApplicationTests.java
+index 93d87b5..db44e82 100644
+--- a/src/test/java/br/edu/fiec/helptec/HelptecApplicationTests.java
++++ b/src/test/java/br/edu/fiec/helptec/HelptecApplicationTests.java
+@@ -1,9 +1,17 @@
+ package br.edu.fiec.helptec;
+ 
+ import org.junit.jupiter.api.Test;
++import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
+ import org.springframework.boot.test.context.SpringBootTest;
+ 
++/**
++ * Teste de INTEGRAÇÃO: sobe a aplicação inteira, então precisa do banco
++ * (MySQL) e das variáveis de ambiente (GOOGLE_CLIENT_ID etc.).
++ * Por isso fica fora do "./mvnw test" comum. Para rodar:
++ *   ./mvnw test -Dintegracao=true
++ */
+ @SpringBootTest
++@EnabledIfSystemProperty(named = "integracao", matches = "true")
+ class HelptecApplicationTests {
+ 
+ 	@Test
+diff --git a/src/test/java/br/edu/fiec/helptec/config/JwtServiceTest.java b/src/test/java/br/edu/fiec/helptec/config/JwtServiceTest.java
+new file mode 100644
+index 0000000..5892237
+--- /dev/null
++++ b/src/test/java/br/edu/fiec/helptec/config/JwtServiceTest.java
+@@ -0,0 +1,94 @@
++package br.edu.fiec.helptec.config;
++
++import br.edu.fiec.helptec.features.usuario.model.entity.UserRole;
++import br.edu.fiec.helptec.features.usuario.model.entity.UsuarioEntity;
++import br.edu.fiec.helptec.support.Fabrica;
++import io.jsonwebtoken.ExpiredJwtException;
++import io.jsonwebtoken.JwtException;
++import org.junit.jupiter.api.BeforeEach;
++import org.junit.jupiter.api.DisplayName;
++import org.junit.jupiter.api.Test;
++import org.springframework.test.util.ReflectionTestUtils;
++
++import java.nio.charset.StandardCharsets;
++import java.util.Base64;
++
++import static org.junit.jupiter.api.Assertions.assertEquals;
++import static org.junit.jupiter.api.Assertions.assertFalse;
++import static org.junit.jupiter.api.Assertions.assertThrows;
++import static org.junit.jupiter.api.Assertions.assertTrue;
++
++/**
++ * JwtService sem Spring: a chave e a validade são injetadas direto nos campos
++ * (ReflectionTestUtils), como o @Value faria.
++ */
++@DisplayName("JwtService")
++class JwtServiceTest {
++
++    private static final String CHAVE_TESTE = base64("chave-de-teste-do-helptec-com-mais-de-48-bytes-para-o-hmac");
++    private static final String OUTRA_CHAVE = base64("outra-chave-qualquer-do-helptec-com-mais-de-48-bytes-hmac!");
++
++    private JwtService jwtService;
++    private UsuarioEntity usuario;
++
++    private static String base64(String texto) {
++        return Base64.getEncoder().encodeToString(texto.getBytes(StandardCharsets.UTF_8));
++    }
++
++    private void configurar(String chave, long validadeMs) {
++        ReflectionTestUtils.setField(jwtService, "secretKey", chave);
++        ReflectionTestUtils.setField(jwtService, "jwtExpirationMs", validadeMs);
++    }
++
++    @BeforeEach
++    void init() {
++        jwtService = new JwtService();
++        configurar(CHAVE_TESTE, 60_000L);
++        usuario = Fabrica.usuario(UserRole.SUPORTE);
++    }
++
++    @Test
++    @DisplayName("o token leva o e-mail como subject e o id do usuário")
++    void deveGerarTokenComEmailEId() {
++        //impl
++        String token = jwtService.generateTokenWithClaims(usuario);
++
++        //asserts
++        assertEquals(usuario.getEmail(), jwtService.extractUsername(token));
++        assertEquals(usuario.getId().toString(), jwtService.extractClaim(token, c -> c.get("id", String.class)));
++    }
++
++    @Test
++    @DisplayName("token é válido para o próprio usuário e inválido para outro")
++    void deveValidarDonoDoToken() {
++        //mocks
++        String token = jwtService.generateTokenWithClaims(usuario);
++        UsuarioEntity outro = Fabrica.usuario(UserRole.ADMIN);
++
++        //impl + asserts
++        assertTrue(jwtService.isTokenValid(token, usuario));
++        assertFalse(jwtService.isTokenValid(token, outro));
++    }
++
++    @Test
++    @DisplayName("token expirado é recusado")
++    void deveRecusarTokenExpirado() {
++        //mocks
++        configurar(CHAVE_TESTE, -1_000L); // já nasce vencido
++        String token = jwtService.generateTokenWithClaims(usuario);
++
++        //impl + asserts
++        assertThrows(ExpiredJwtException.class, () -> jwtService.isTokenValid(token, usuario));
++    }
++
++    @Test
++    @DisplayName("token assinado com outra chave é recusado")
++    void deveRecusarTokenComAssinaturaInvalida() {
++        //mocks
++        String token = jwtService.generateTokenWithClaims(usuario);
++        configurar(OUTRA_CHAVE, 60_000L);
++
++        //impl + asserts
++        assertThrows(JwtException.class, () -> jwtService.extractUsername(token));
++    }
++}
+diff --git a/src/test/java/br/edu/fiec/helptec/features/auth/service/AuthServiceImplTest.java b/src/test/java/br/edu/fiec/helptec/features/auth/service/AuthServiceImplTest.java
+new file mode 100644
+index 0000000..1f2672b
+--- /dev/null
++++ b/src/test/java/br/edu/fiec/helptec/features/auth/service/AuthServiceImplTest.java
+@@ -0,0 +1,180 @@
++package br.edu.fiec.helptec.features.auth.service;
++
++import br.edu.fiec.helptec.config.JwtService;
++import br.edu.fiec.helptec.features.auth.models.AuthResponse;
++import br.edu.fiec.helptec.features.auth.models.GoogleLoginRequest;
++import br.edu.fiec.helptec.features.auth.models.LoginRequest;
++import br.edu.fiec.helptec.features.auth.models.RegisterRequest;
++import br.edu.fiec.helptec.features.auth.service.ipml.AuthServiceImpl;
++import br.edu.fiec.helptec.features.usuario.model.entity.UserRole;
++import br.edu.fiec.helptec.features.usuario.model.entity.UsuarioEntity;
++import br.edu.fiec.helptec.features.usuario.repository.UsuarioRepository;
++import br.edu.fiec.helptec.support.Fabrica;
++import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
++import org.junit.jupiter.api.DisplayName;
++import org.junit.jupiter.api.Test;
++import org.junit.jupiter.api.extension.ExtendWith;
++import org.mockito.ArgumentCaptor;
++import org.mockito.InjectMocks;
++import org.mockito.Mock;
++import org.mockito.junit.jupiter.MockitoExtension;
++import org.springframework.http.HttpStatus;
++import org.springframework.security.authentication.AuthenticationManager;
++import org.springframework.security.authentication.BadCredentialsException;
++import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
++import org.springframework.security.crypto.password.PasswordEncoder;
++import org.springframework.web.server.ResponseStatusException;
++
++import java.util.Optional;
++
++import static org.junit.jupiter.api.Assertions.assertEquals;
++import static org.junit.jupiter.api.Assertions.assertThrows;
++import static org.mockito.ArgumentMatchers.any;
++import static org.mockito.Mockito.never;
++import static org.mockito.Mockito.verify;
++import static org.mockito.Mockito.when;
++
++@ExtendWith(MockitoExtension.class)
++@DisplayName("AuthServiceImpl")
++class AuthServiceImplTest {
++
++    private static final String EMAIL = "ana@fiec.edu.br";
++
++    @Mock
++    private UsuarioRepository usuarioRepository;
++
++    @Mock
++    private PasswordEncoder passwordEncoder;
++
++    @Mock
++    private JwtService jwtService;
++
++    @Mock
++    private AuthenticationManager authenticationManager;
++
++    @Mock
++    private GoogleTokenVerifier googleTokenVerifier;
++
++    @InjectMocks
++    private AuthServiceImpl authService;
++
++    private static GoogleIdToken.Payload payloadGoogle(String email, Boolean verificado) {
++        GoogleIdToken.Payload payload = new GoogleIdToken.Payload();
++        payload.setEmail(email);
++        payload.setEmailVerified(verificado);
++        return payload;
++    }
++
++    // ---------------- Cadastro ----------------
++
++    @Test
++    @DisplayName("cadastro: grava a senha criptografada e o papel USER")
++    void deveCadastrarComSenhaCriptografada() {
++        //mocks
++        when(usuarioRepository.findByEmail(EMAIL)).thenReturn(Optional.empty());
++        when(passwordEncoder.encode("123456")).thenReturn("hash-bcrypt");
++
++        //impl
++        authService.register(new RegisterRequest("Ana", EMAIL, "123456", null));
++
++        //asserts
++        ArgumentCaptor<UsuarioEntity> captor = ArgumentCaptor.forClass(UsuarioEntity.class);
++        verify(usuarioRepository).save(captor.capture());
++        assertEquals("hash-bcrypt", captor.getValue().getPassword(), "a senha nunca é gravada em texto puro");
++        assertEquals(UserRole.USER, captor.getValue().getRole());
++    }
++
++    @Test
++    @DisplayName("cadastro: recusa e-mail já cadastrado")
++    void naoDeveCadastrarEmailRepetido() {
++        //mocks
++        when(usuarioRepository.findByEmail(EMAIL)).thenReturn(Optional.of(Fabrica.usuario(UserRole.USER)));
++
++        //impl
++        IllegalArgumentException erro = assertThrows(IllegalArgumentException.class,
++                () -> authService.register(new RegisterRequest("Ana", EMAIL, "123456", null)));
++
++        //asserts
++        assertEquals("E-mail já cadastrado no sistema.", erro.getMessage());
++        verify(usuarioRepository, never()).save(any());
++    }
++
++    // ---------------- Login com e-mail e senha ----------------
++
++    @Test
++    @DisplayName("login: credenciais válidas devolvem o JWT")
++    void deveLogarEDevolverToken() {
++        //mocks
++        UsuarioEntity usuario = Fabrica.usuario(UserRole.USER);
++        when(usuarioRepository.findByEmail(EMAIL)).thenReturn(Optional.of(usuario));
++        when(jwtService.generateTokenWithClaims(usuario)).thenReturn("jwt-gerado");
++
++        //impl
++        AuthResponse resposta = authService.login(new LoginRequest(EMAIL, "123456"));
++
++        //asserts
++        assertEquals("jwt-gerado", resposta.token());
++        verify(authenticationManager).authenticate(new UsernamePasswordAuthenticationToken(EMAIL, "123456"));
++    }
++
++    @Test
++    @DisplayName("login: senha errada não gera token")
++    void naoDeveLogarComSenhaErrada() {
++        //mocks
++        when(authenticationManager.authenticate(any())).thenThrow(new BadCredentialsException("Credenciais inválidas"));
++
++        //impl + asserts
++        assertThrows(BadCredentialsException.class, () -> authService.login(new LoginRequest(EMAIL, "errada")));
++        verify(jwtService, never()).generateTokenWithClaims(any());
++    }
++
++    // ---------------- Login com Google (app) ----------------
++
++    @Test
++    @DisplayName("Google: usuário cadastrado recebe o JWT e o token de push é atualizado")
++    void deveLogarComGoogle() {
++        //mocks
++        UsuarioEntity usuario = Fabrica.usuario(UserRole.APROVADOR);
++        when(googleTokenVerifier.verify("id-token")).thenReturn(payloadGoogle(EMAIL, true));
++        when(usuarioRepository.findByEmail(EMAIL)).thenReturn(Optional.of(usuario));
++        when(jwtService.generateTokenWithClaims(usuario)).thenReturn("jwt-google");
++
++        //impl
++        AuthResponse resposta = authService.loginComGoogle(new GoogleLoginRequest("id-token", "fcm-123"));
++
++        //asserts
++        assertEquals("jwt-google", resposta.token());
++        assertEquals("fcm-123", usuario.getFcmToken());
++        verify(usuarioRepository).save(usuario);
++    }
++
++    @Test
++    @DisplayName("Google: e-mail não verificado é recusado com 401")
++    void naoDeveAceitarEmailNaoVerificado() {
++        //mocks
++        when(googleTokenVerifier.verify("id-token")).thenReturn(payloadGoogle(EMAIL, false));
++
++        //impl
++        ResponseStatusException erro = assertThrows(ResponseStatusException.class,
++                () -> authService.loginComGoogle(new GoogleLoginRequest("id-token", null)));
++
++        //asserts
++        assertEquals(HttpStatus.UNAUTHORIZED, erro.getStatusCode());
++    }
++
++    @Test
++    @DisplayName("Google: e-mail sem cadastro é recusado com 404")
++    void naoDeveLogarComGoogleSemCadastro() {
++        //mocks
++        when(googleTokenVerifier.verify("id-token")).thenReturn(payloadGoogle(EMAIL, true));
++        when(usuarioRepository.findByEmail(EMAIL)).thenReturn(Optional.empty());
++
++        //impl
++        ResponseStatusException erro = assertThrows(ResponseStatusException.class,
++                () -> authService.loginComGoogle(new GoogleLoginRequest("id-token", null)));
++
++        //asserts
++        assertEquals(HttpStatus.NOT_FOUND, erro.getStatusCode());
++        verify(jwtService, never()).generateTokenWithClaims(any());
++    }
++}
+diff --git a/src/test/java/br/edu/fiec/helptec/features/chamado/controller/ChamadoControllerTest.java b/src/test/java/br/edu/fiec/helptec/features/chamado/controller/ChamadoControllerTest.java
+new file mode 100644
+index 0000000..02cd29e
+--- /dev/null
++++ b/src/test/java/br/edu/fiec/helptec/features/chamado/controller/ChamadoControllerTest.java
+@@ -0,0 +1,170 @@
++package br.edu.fiec.helptec.features.chamado.controller;
++
++import br.edu.fiec.helptec.config.UserContext;
++import br.edu.fiec.helptec.features.chamado.StatusChamado;
++import br.edu.fiec.helptec.features.chamado.model.dto.ChamadoDTO;
++import br.edu.fiec.helptec.features.chamado.service.ChamadoAnexoService;
++import br.edu.fiec.helptec.features.chamado.service.ChamadoService;
++import br.edu.fiec.helptec.features.usuario.model.entity.UserRole;
++import br.edu.fiec.helptec.features.usuario.model.entity.UsuarioEntity;
++import br.edu.fiec.helptec.support.Fabrica;
++import org.junit.jupiter.api.AfterEach;
++import org.junit.jupiter.api.BeforeEach;
++import org.junit.jupiter.api.DisplayName;
++import org.junit.jupiter.api.Test;
++import org.junit.jupiter.api.extension.ExtendWith;
++import org.mockito.ArgumentCaptor;
++import org.mockito.InjectMocks;
++import org.mockito.Mock;
++import org.mockito.junit.jupiter.MockitoExtension;
++import org.springframework.http.MediaType;
++import org.springframework.test.web.servlet.MockMvc;
++import org.springframework.test.web.servlet.setup.MockMvcBuilders;
++
++import java.util.UUID;
++
++import static org.junit.jupiter.api.Assertions.assertEquals;
++import static org.mockito.ArgumentMatchers.any;
++import static org.mockito.Mockito.never;
++import static org.mockito.Mockito.verify;
++import static org.mockito.Mockito.when;
++import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
++import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
++import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
++import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
++import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
++import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
++
++/**
++ * Camada HTTP dos chamados. As permissões por papel (@PreAuthorize) não são
++ * avaliadas no MockMvc standalone: aqui o foco é rota, corpo e status.
++ */
++@ExtendWith(MockitoExtension.class)
++@DisplayName("ChamadoController")
++class ChamadoControllerTest {
++
++    private MockMvc mockMvc;
++
++    @Mock
++    private ChamadoService chamadoService;
++
++    @Mock
++    private ChamadoAnexoService chamadoAnexoService;
++
++    @InjectMocks
++    private ChamadoController chamadoController;
++
++    @BeforeEach
++    void init() {
++        mockMvc = MockMvcBuilders.standaloneSetup(chamadoController).build();
++    }
++
++    @AfterEach
++    void limparUsuarioLogado() {
++        UserContext.clear();
++    }
++
++    private static ChamadoDTO dto(Long id, StatusChamado status) {
++        ChamadoDTO dto = new ChamadoDTO();
++        dto.setIdChamado(id);
++        dto.setStatus(status);
++        dto.setDescricao("PC não liga");
++        return dto;
++    }
++
++    @Test
++    @DisplayName("GET /api/chamados/{id} devolve 200 com o chamado")
++    void deveBuscarChamado() throws Exception {
++        //mocks
++        when(chamadoService.buscarPorId(1L)).thenReturn(dto(1L, StatusChamado.APROVADO));
++
++        //impl + asserts
++        mockMvc.perform(get("/api/chamados/1"))
++                .andExpect(status().isOk())
++                .andExpect(jsonPath("$.idChamado").value(1))
++                .andExpect(jsonPath("$.status").value("APROVADO"));
++    }
++
++    @Test
++    @DisplayName("POST sem usuário logado devolve 401 e não cria nada")
++    void naoDeveCriarSemUsuarioLogado() throws Exception {
++        //impl + asserts
++        mockMvc.perform(post("/api/chamados")
++                        .contentType(MediaType.APPLICATION_JSON)
++                        .content("{\"descricao\":\"PC não liga\"}"))
++                .andExpect(status().isUnauthorized());
++        verify(chamadoService, never()).criar(any());
++    }
++
++    @Test
++    @DisplayName("POST usa o usuário logado como solicitante, ignorando o corpo")
++    void deveCriarComUsuarioLogado() throws Exception {
++        //mocks
++        UsuarioEntity logado = Fabrica.usuario(UserRole.USER);
++        UserContext.setUser(logado);
++        when(chamadoService.criar(any(ChamadoDTO.class))).thenReturn(dto(5L, StatusChamado.AGUARDANDO_APROVACAO));
++        String corpo = "{\"descricao\":\"PC não liga\",\"idUsuario\":\"" + UUID.randomUUID() + "\"}";
++
++        //impl
++        mockMvc.perform(post("/api/chamados").contentType(MediaType.APPLICATION_JSON).content(corpo))
++                .andExpect(status().isCreated())
++                .andExpect(jsonPath("$.idChamado").value(5));
++
++        //asserts
++        ArgumentCaptor<ChamadoDTO> captor = ArgumentCaptor.forClass(ChamadoDTO.class);
++        verify(chamadoService).criar(captor.capture());
++        assertEquals(logado.getId(), captor.getValue().getIdUsuario());
++    }
++
++    @Test
++    @DisplayName("PATCH /aprovar usa o id do aprovador logado")
++    void deveAprovarComUsuarioLogado() throws Exception {
++        //mocks
++        UsuarioEntity aprovador = Fabrica.usuario(UserRole.APROVADOR);
++        UserContext.setUser(aprovador);
++        when(chamadoService.aprovar(1L, aprovador.getId())).thenReturn(dto(1L, StatusChamado.APROVADO));
++
++        //impl + asserts
++        mockMvc.perform(patch("/api/chamados/1/aprovar"))
++                .andExpect(status().isOk())
++                .andExpect(jsonPath("$.status").value("APROVADO"));
++    }
++
++    @Test
++    @DisplayName("PATCH /triagem repassa o suporte escolhido")
++    void deveTriar() throws Exception {
++        //mocks
++        UUID idSuporte = UUID.randomUUID();
++        when(chamadoService.triar(1L, idSuporte)).thenReturn(dto(1L, StatusChamado.EM_ATENDIMENTO));
++
++        //impl + asserts
++        mockMvc.perform(patch("/api/chamados/1/triagem")
++                        .contentType(MediaType.APPLICATION_JSON)
++                        .content("{\"idSuporte\":\"" + idSuporte + "\"}"))
++                .andExpect(status().isOk())
++                .andExpect(jsonPath("$.status").value("EM_ATENDIMENTO"));
++    }
++
++    @Test
++    @DisplayName("PATCH /resolver recebe a devolutiva em texto puro")
++    void deveResolver() throws Exception {
++        //mocks
++        when(chamadoService.resolver(1L, "Fonte trocada")).thenReturn(dto(1L, StatusChamado.RESOLVIDO));
++
++        //impl + asserts
++        mockMvc.perform(patch("/api/chamados/1/resolver")
++                        .contentType(MediaType.TEXT_PLAIN)
++                        .content("Fonte trocada"))
++                .andExpect(status().isOk())
++                .andExpect(jsonPath("$.status").value("RESOLVIDO"));
++    }
++
++    @Test
++    @DisplayName("DELETE /api/chamados/{id} devolve 204")
++    void deveDeletar() throws Exception {
++        //impl + asserts
++        mockMvc.perform(delete("/api/chamados/1"))
++                .andExpect(status().isNoContent());
++        verify(chamadoService).deletar(1L);
++    }
++}
+diff --git a/src/test/java/br/edu/fiec/helptec/features/chamado/service/ChamadoServiceTest.java b/src/test/java/br/edu/fiec/helptec/features/chamado/service/ChamadoServiceTest.java
+new file mode 100644
+index 0000000..a286247
+--- /dev/null
++++ b/src/test/java/br/edu/fiec/helptec/features/chamado/service/ChamadoServiceTest.java
+@@ -0,0 +1,356 @@
++package br.edu.fiec.helptec.features.chamado.service;
++
++import br.edu.fiec.helptec.features.chamado.Chamado;
++import br.edu.fiec.helptec.features.chamado.StatusChamado;
++import br.edu.fiec.helptec.features.chamado.model.dto.ChamadoDTO;
++import br.edu.fiec.helptec.features.chamado.model.dto.ChamadoFilterDTO;
++import br.edu.fiec.helptec.features.chamado.repository.ChamadoRepository;
++import br.edu.fiec.helptec.features.commons.PageRequestDTO;
++import br.edu.fiec.helptec.features.commons.PageResponseDTO;
++import br.edu.fiec.helptec.features.usuario.model.entity.UserRole;
++import br.edu.fiec.helptec.features.usuario.model.entity.UsuarioEntity;
++import br.edu.fiec.helptec.features.usuario.repository.UsuarioRepository;
++import br.edu.fiec.helptec.support.Fabrica;
++import org.junit.jupiter.api.DisplayName;
++import org.junit.jupiter.api.Nested;
++import org.junit.jupiter.api.Test;
++import org.junit.jupiter.api.extension.ExtendWith;
++import org.junit.jupiter.params.ParameterizedTest;
++import org.junit.jupiter.params.provider.EnumSource;
++import org.mockito.ArgumentCaptor;
++import org.mockito.InjectMocks;
++import org.mockito.Mock;
++import org.mockito.junit.jupiter.MockitoExtension;
++import org.springframework.data.domain.PageImpl;
++import org.springframework.data.domain.PageRequest;
++
++import java.time.LocalDate;
++import java.util.List;
++import java.util.Optional;
++import java.util.UUID;
++
++import static org.junit.jupiter.api.Assertions.assertEquals;
++import static org.junit.jupiter.api.Assertions.assertNull;
++import static org.junit.jupiter.api.Assertions.assertThrows;
++import static org.mockito.ArgumentMatchers.any;
++import static org.mockito.Mockito.never;
++import static org.mockito.Mockito.verify;
++import static org.mockito.Mockito.when;
++
++/**
++ * Regras do fluxo do chamado:
++ * AGUARDANDO_APROVACAO -> APROVADO/REPROVADO -> (triagem) EM_ATENDIMENTO -> RESOLVIDO.
++ * Os repositórios são simulados (Mockito): o teste não precisa de banco.
++ */
++@ExtendWith(MockitoExtension.class)
++@DisplayName("ChamadoService")
++class ChamadoServiceTest {
++
++    private static final Long ID_CHAMADO = 1L;
++    private static final UUID ID_SOLICITANTE = UUID.randomUUID();
++
++    @Mock
++    private ChamadoRepository chamadoRepository;
++
++    @Mock
++    private UsuarioRepository usuarioRepository;
++
++    @InjectMocks
++    private ChamadoService chamadoService;
++
++    /** Faz o save "devolver" o próprio objeto salvo, como o banco faria. */
++    private void saveDevolveOMesmoObjeto() {
++        when(chamadoRepository.save(any(Chamado.class))).thenAnswer(inv -> inv.getArgument(0));
++    }
++
++    private Chamado chamadoSalvo() {
++        ArgumentCaptor<Chamado> captor = ArgumentCaptor.forClass(Chamado.class);
++        verify(chamadoRepository).save(captor.capture());
++        return captor.getValue();
++    }
++
++    @Nested
++    @DisplayName("Abertura")
++    class Abertura {
++
++        @Test
++        @DisplayName("deve abrir o chamado aguardando aprovação, com a área do solicitante")
++        void deveCriarChamadoAguardandoAprovacao() {
++            //mocks
++            UsuarioEntity solicitante = Fabrica.usuario(ID_SOLICITANTE, UserRole.USER);
++            when(usuarioRepository.findById(ID_SOLICITANTE)).thenReturn(Optional.of(solicitante));
++            saveDevolveOMesmoObjeto();
++
++            // Campos que o cliente NÃO pode definir: o serviço tem que ignorar
++            ChamadoDTO dto = new ChamadoDTO();
++            dto.setIdChamado(99L);
++            dto.setIdUsuario(ID_SOLICITANTE);
++            dto.setDescricao("Projetor sem imagem");
++            dto.setPrioridade("MEDIA");
++            dto.setStatus(StatusChamado.RESOLVIDO);
++            dto.setIdSuporte(UUID.randomUUID());
++            dto.setResolucao("já resolvido");
++            dto.setIdSala(3L);
++
++            //impl
++            ChamadoDTO resultado = chamadoService.criar(dto);
++
++            //asserts
++            Chamado salvo = chamadoSalvo();
++            assertNull(salvo.getIdChamado(), "o id é gerado pelo banco");
++            assertEquals(StatusChamado.AGUARDANDO_APROVACAO, salvo.getStatus());
++            assertEquals(Fabrica.AREA, salvo.getArea());
++            assertEquals(LocalDate.now(), salvo.getDataAbertura());
++            assertNull(salvo.getIdSuporte());
++            assertNull(salvo.getResolucao());
++            assertNull(salvo.getDataFinal());
++            assertEquals("Projetor sem imagem", resultado.getDescricao());
++            assertEquals(Long.valueOf(3L), resultado.getIdSala());
++            assertEquals(ID_SOLICITANTE, resultado.getIdUsuario());
++        }
++
++        @Test
++        @DisplayName("não deve abrir chamado de solicitante inexistente")
++        void naoDeveCriarChamadoSemSolicitante() {
++            //mocks
++            when(usuarioRepository.findById(ID_SOLICITANTE)).thenReturn(Optional.empty());
++            ChamadoDTO dto = new ChamadoDTO();
++            dto.setIdUsuario(ID_SOLICITANTE);
++
++            //impl
++            RuntimeException erro = assertThrows(RuntimeException.class, () -> chamadoService.criar(dto));
++
++            //asserts
++            assertEquals("Usuário solicitante não encontrado", erro.getMessage());
++            verify(chamadoRepository, never()).save(any());
++        }
++    }
++
++    @Nested
++    @DisplayName("Aprovação")
++    class Aprovacao {
++
++        @Test
++        @DisplayName("deve aprovar sem trocar o solicitante pelo aprovador")
++        void deveAprovarChamado() {
++            //mocks
++            UUID idAprovador = UUID.randomUUID();
++            when(chamadoRepository.findById(ID_CHAMADO))
++                    .thenReturn(Optional.of(Fabrica.chamado(ID_CHAMADO, ID_SOLICITANTE, StatusChamado.AGUARDANDO_APROVACAO)));
++            saveDevolveOMesmoObjeto();
++
++            //impl
++            ChamadoDTO resultado = chamadoService.aprovar(ID_CHAMADO, idAprovador);
++
++            //asserts
++            assertEquals(StatusChamado.APROVADO, resultado.getStatus());
++            assertEquals(ID_SOLICITANTE, resultado.getIdUsuario(), "o solicitante não pode ser sobrescrito");
++        }
++
++        @Test
++        @DisplayName("deve reprovar chamado aguardando aprovação")
++        void deveReprovarChamado() {
++            //mocks
++            when(chamadoRepository.findById(ID_CHAMADO))
++                    .thenReturn(Optional.of(Fabrica.chamado(ID_CHAMADO, ID_SOLICITANTE, StatusChamado.AGUARDANDO_APROVACAO)));
++            saveDevolveOMesmoObjeto();
++
++            //impl
++            ChamadoDTO resultado = chamadoService.reprovar(ID_CHAMADO, UUID.randomUUID());
++
++            //asserts
++            assertEquals(StatusChamado.REPROVADO, resultado.getStatus());
++            assertEquals(ID_SOLICITANTE, resultado.getIdUsuario());
++        }
++
++        @ParameterizedTest(name = "status {0}")
++        @EnumSource(value = StatusChamado.class, names = "AGUARDANDO_APROVACAO", mode = EnumSource.Mode.EXCLUDE)
++        @DisplayName("não deve aprovar chamado fora de 'aguardando aprovação'")
++        void naoDeveAprovarForaDoStatus(StatusChamado status) {
++            //mocks
++            when(chamadoRepository.findById(ID_CHAMADO))
++                    .thenReturn(Optional.of(Fabrica.chamado(ID_CHAMADO, ID_SOLICITANTE, status)));
++
++            //impl + asserts
++            assertThrows(IllegalStateException.class, () -> chamadoService.aprovar(ID_CHAMADO, UUID.randomUUID()));
++            verify(chamadoRepository, never()).save(any());
++        }
++
++        @Test
++        @DisplayName("não deve reprovar chamado já aprovado")
++        void naoDeveReprovarChamadoAprovado() {
++            //mocks
++            when(chamadoRepository.findById(ID_CHAMADO))
++                    .thenReturn(Optional.of(Fabrica.chamado(ID_CHAMADO, ID_SOLICITANTE, StatusChamado.APROVADO)));
++
++            //impl + asserts
++            assertThrows(IllegalStateException.class, () -> chamadoService.reprovar(ID_CHAMADO, UUID.randomUUID()));
++            verify(chamadoRepository, never()).save(any());
++        }
++    }
++
++    @Nested
++    @DisplayName("Triagem")
++    class Triagem {
++
++        @Test
++        @DisplayName("deve alocar um usuário de suporte e colocar em atendimento")
++        void deveTriarChamadoAprovado() {
++            //mocks
++            UsuarioEntity suporte = Fabrica.usuario(UserRole.SUPORTE);
++            when(chamadoRepository.findById(ID_CHAMADO))
++                    .thenReturn(Optional.of(Fabrica.chamado(ID_CHAMADO, ID_SOLICITANTE, StatusChamado.APROVADO)));
++            when(usuarioRepository.findById(suporte.getId())).thenReturn(Optional.of(suporte));
++            saveDevolveOMesmoObjeto();
++
++            //impl
++            ChamadoDTO resultado = chamadoService.triar(ID_CHAMADO, suporte.getId());
++
++            //asserts
++            assertEquals(StatusChamado.EM_ATENDIMENTO, resultado.getStatus());
++            assertEquals(suporte.getId(), resultado.getIdSuporte());
++        }
++
++        @Test
++        @DisplayName("não deve alocar usuário que não é do suporte")
++        void naoDeveTriarParaQuemNaoESuporte() {
++            //mocks
++            UsuarioEntity aprovador = Fabrica.usuario(UserRole.APROVADOR);
++            when(chamadoRepository.findById(ID_CHAMADO))
++                    .thenReturn(Optional.of(Fabrica.chamado(ID_CHAMADO, ID_SOLICITANTE, StatusChamado.APROVADO)));
++            when(usuarioRepository.findById(aprovador.getId())).thenReturn(Optional.of(aprovador));
++
++            //impl
++            IllegalStateException erro = assertThrows(IllegalStateException.class,
++                    () -> chamadoService.triar(ID_CHAMADO, aprovador.getId()));
++
++            //asserts
++            assertEquals("Usuário selecionado não possui papel de suporte", erro.getMessage());
++            verify(chamadoRepository, never()).save(any());
++        }
++
++        @Test
++        @DisplayName("não deve triar quando o usuário de suporte não existe")
++        void naoDeveTriarComSuporteInexistente() {
++            //mocks
++            UUID idInexistente = UUID.randomUUID();
++            when(chamadoRepository.findById(ID_CHAMADO))
++                    .thenReturn(Optional.of(Fabrica.chamado(ID_CHAMADO, ID_SOLICITANTE, StatusChamado.APROVADO)));
++            when(usuarioRepository.findById(idInexistente)).thenReturn(Optional.empty());
++
++            //impl + asserts
++            RuntimeException erro = assertThrows(RuntimeException.class,
++                    () -> chamadoService.triar(ID_CHAMADO, idInexistente));
++            assertEquals("Usuário de suporte não encontrado", erro.getMessage());
++        }
++
++        @Test
++        @DisplayName("não deve triar chamado que ainda não foi aprovado")
++        void naoDeveTriarChamadoNaoAprovado() {
++            //mocks
++            when(chamadoRepository.findById(ID_CHAMADO))
++                    .thenReturn(Optional.of(Fabrica.chamado(ID_CHAMADO, ID_SOLICITANTE, StatusChamado.AGUARDANDO_APROVACAO)));
++
++            //impl + asserts
++            assertThrows(IllegalStateException.class, () -> chamadoService.triar(ID_CHAMADO, UUID.randomUUID()));
++            verify(usuarioRepository, never()).findById(any());
++        }
++    }
++
++    @Nested
++    @DisplayName("Resolução")
++    class Resolucao {
++
++        @Test
++        @DisplayName("deve resolver com devolutiva e data de encerramento")
++        void deveResolverChamadoEmAtendimento() {
++            //mocks
++            when(chamadoRepository.findById(ID_CHAMADO))
++                    .thenReturn(Optional.of(Fabrica.chamado(ID_CHAMADO, ID_SOLICITANTE, StatusChamado.EM_ATENDIMENTO)));
++            saveDevolveOMesmoObjeto();
++
++            //impl
++            ChamadoDTO resultado = chamadoService.resolver(ID_CHAMADO, "Fonte trocada");
++
++            //asserts
++            assertEquals(StatusChamado.RESOLVIDO, resultado.getStatus());
++            assertEquals("Fonte trocada", resultado.getResolucao());
++            assertEquals(LocalDate.now(), resultado.getDataFinal());
++        }
++
++        @Test
++        @DisplayName("não deve resolver chamado que não está em atendimento")
++        void naoDeveResolverForaDeAtendimento() {
++            //mocks
++            when(chamadoRepository.findById(ID_CHAMADO))
++                    .thenReturn(Optional.of(Fabrica.chamado(ID_CHAMADO, ID_SOLICITANTE, StatusChamado.APROVADO)));
++
++            //impl + asserts
++            assertThrows(IllegalStateException.class, () -> chamadoService.resolver(ID_CHAMADO, "ok"));
++            verify(chamadoRepository, never()).save(any());
++        }
++    }
++
++    @Nested
++    @DisplayName("Consulta e exclusão")
++    class ConsultaEExclusao {
++
++        @Test
++        @DisplayName("deve converter a página do repositório no DTO de paginação")
++        void deveBuscarComFiltro() {
++            //mocks
++            ChamadoFilterDTO filtro = new ChamadoFilterDTO();
++            PageRequestDTO pagina = new PageRequestDTO(0, 2);
++            List<Chamado> chamados = List.of(
++                    Fabrica.chamado(1L, ID_SOLICITANTE, StatusChamado.APROVADO),
++                    Fabrica.chamado(2L, ID_SOLICITANTE, StatusChamado.RESOLVIDO));
++            when(chamadoRepository.buscarGenerica(filtro, pagina))
++                    .thenReturn(new PageImpl<>(chamados, PageRequest.of(0, 2), 5));
++
++            //impl
++            PageResponseDTO<ChamadoDTO> resultado = chamadoService.buscarComFiltro(filtro, pagina);
++
++            //asserts
++            assertEquals(2, resultado.getItens().size());
++            assertEquals(5, resultado.getTotalItens());
++            assertEquals(0, resultado.getPaginaAtual());
++            assertEquals(3, resultado.getTotalPaginas());
++            assertEquals(Long.valueOf(1L), resultado.getItens().get(0).getIdChamado());
++        }
++
++        @Test
++        @DisplayName("deve falhar ao buscar chamado inexistente")
++        void naoDeveBuscarChamadoInexistente() {
++            //mocks
++            when(chamadoRepository.findById(ID_CHAMADO)).thenReturn(Optional.empty());
++
++            //impl + asserts
++            RuntimeException erro = assertThrows(RuntimeException.class, () -> chamadoService.buscarPorId(ID_CHAMADO));
++            assertEquals("Chamado não encontrado", erro.getMessage());
++        }
++
++        @Test
++        @DisplayName("deve excluir chamado existente")
++        void deveDeletarChamado() {
++            //mocks
++            when(chamadoRepository.existsById(ID_CHAMADO)).thenReturn(true);
++
++            //impl
++            chamadoService.deletar(ID_CHAMADO);
++
++            //asserts
++            verify(chamadoRepository).deleteById(ID_CHAMADO);
++        }
++
++        @Test
++        @DisplayName("não deve excluir chamado inexistente")
++        void naoDeveDeletarChamadoInexistente() {
++            //mocks
++            when(chamadoRepository.existsById(ID_CHAMADO)).thenReturn(false);
++
++            //impl + asserts
++            assertThrows(RuntimeException.class, () -> chamadoService.deletar(ID_CHAMADO));
++            verify(chamadoRepository, never()).deleteById(any());
++        }
++    }
++}
+diff --git a/src/test/java/br/edu/fiec/helptec/features/equipamento/service/EquipamentoServiceTest.java b/src/test/java/br/edu/fiec/helptec/features/equipamento/service/EquipamentoServiceTest.java
+new file mode 100644
+index 0000000..85760fa
+--- /dev/null
++++ b/src/test/java/br/edu/fiec/helptec/features/equipamento/service/EquipamentoServiceTest.java
+@@ -0,0 +1,103 @@
++package br.edu.fiec.helptec.features.equipamento.service;
++
++import br.edu.fiec.helptec.features.equipamento.Equipamento;
++import br.edu.fiec.helptec.features.equipamento.model.dto.EquipamentoDTO;
++import br.edu.fiec.helptec.features.equipamento.repository.EquipamentoRepository;
++import org.junit.jupiter.api.DisplayName;
++import org.junit.jupiter.api.Test;
++import org.junit.jupiter.api.extension.ExtendWith;
++import org.mockito.InjectMocks;
++import org.mockito.Mock;
++import org.mockito.junit.jupiter.MockitoExtension;
++
++import java.util.Optional;
++
++import static org.junit.jupiter.api.Assertions.assertAll;
++import static org.junit.jupiter.api.Assertions.assertEquals;
++import static org.junit.jupiter.api.Assertions.assertNull;
++import static org.junit.jupiter.api.Assertions.assertThrows;
++import static org.mockito.ArgumentMatchers.any;
++import static org.mockito.Mockito.never;
++import static org.mockito.Mockito.verify;
++import static org.mockito.Mockito.when;
++
++@ExtendWith(MockitoExtension.class)
++@DisplayName("EquipamentoService")
++class EquipamentoServiceTest {
++
++    @Mock
++    private EquipamentoRepository equipamentoRepository;
++
++    @InjectMocks
++    private EquipamentoService equipamentoService;
++
++    private static Equipamento equipamento(Long id) {
++        return new Equipamento(id, "Projetor Epson", "PAT-0004", "ATIVO", "PROJETOR", 2800.0);
++    }
++
++    @Test
++    @DisplayName("deve criar equipamento com id gerado pelo banco")
++    void deveCriarEquipamento() {
++        //mocks
++        when(equipamentoRepository.save(any(Equipamento.class))).thenAnswer(inv -> {
++            Equipamento e = inv.getArgument(0);
++            assertNull(e.getId(), "o id deve ser gerado pelo banco");
++            e.setId(7L);
++            return e;
++        });
++        EquipamentoDTO dto = new EquipamentoDTO(55L, "Notebook", "PAT-9", "ATIVO", "NOTEBOOK", 4200.0);
++
++        //impl
++        EquipamentoDTO resultado = equipamentoService.criar(dto);
++
++        //asserts
++        assertEquals(Long.valueOf(7L), resultado.getId());
++        assertEquals("PAT-9", resultado.getPatrimonio());
++    }
++
++    @Test
++    @DisplayName("deve atualizar todos os campos do equipamento")
++    void deveAtualizarEquipamento() {
++        //mocks
++        when(equipamentoRepository.findById(4L)).thenReturn(Optional.of(equipamento(4L)));
++        when(equipamentoRepository.save(any(Equipamento.class))).thenAnswer(inv -> inv.getArgument(0));
++        EquipamentoDTO novo = new EquipamentoDTO(null, "Projetor BenQ", "PAT-0040", "MANUTENCAO", "PROJETOR", 3100.0);
++
++        //impl
++        EquipamentoDTO resultado = equipamentoService.atualizar(4L, novo);
++
++        //asserts
++        assertAll(
++                () -> assertEquals(Long.valueOf(4L), resultado.getId()),
++                () -> assertEquals("Projetor BenQ", resultado.getNome()),
++                () -> assertEquals("PAT-0040", resultado.getPatrimonio()),
++                () -> assertEquals("MANUTENCAO", resultado.getStatus()),
++                () -> assertEquals("PROJETOR", resultado.getTipo()),
++                () -> assertEquals(Double.valueOf(3100.0), resultado.getPreco())
++        );
++    }
++
++    @Test
++    @DisplayName("deve falhar ao buscar equipamento inexistente")
++    void naoDeveBuscarEquipamentoInexistente() {
++        //mocks
++        when(equipamentoRepository.findById(9L)).thenReturn(Optional.empty());
++
++        //impl
++        RuntimeException erro = assertThrows(RuntimeException.class, () -> equipamentoService.buscarPorId(9L));
++
++        //asserts
++        assertEquals("Equipamento não encontrado", erro.getMessage());
++    }
++
++    @Test
++    @DisplayName("não deve excluir equipamento inexistente")
++    void naoDeveDeletarEquipamentoInexistente() {
++        //mocks
++        when(equipamentoRepository.existsById(9L)).thenReturn(false);
++
++        //impl + asserts
++        assertThrows(RuntimeException.class, () -> equipamentoService.deletar(9L));
++        verify(equipamentoRepository, never()).deleteById(any());
++    }
++}
+diff --git a/src/test/java/br/edu/fiec/helptec/features/salas/controller/SalasControllerTest.java b/src/test/java/br/edu/fiec/helptec/features/salas/controller/SalasControllerTest.java
+new file mode 100644
+index 0000000..ef2de87
+--- /dev/null
++++ b/src/test/java/br/edu/fiec/helptec/features/salas/controller/SalasControllerTest.java
+@@ -0,0 +1,116 @@
++package br.edu.fiec.helptec.features.salas.controller;
++
++import br.edu.fiec.helptec.features.commons.PageResponseDTO;
++import br.edu.fiec.helptec.features.salas.model.dto.SalasDTO;
++import br.edu.fiec.helptec.features.salas.service.SalasService;
++import jakarta.servlet.ServletException;
++import org.junit.jupiter.api.BeforeEach;
++import org.junit.jupiter.api.DisplayName;
++import org.junit.jupiter.api.Test;
++import org.junit.jupiter.api.extension.ExtendWith;
++import org.mockito.InjectMocks;
++import org.mockito.Mock;
++import org.mockito.junit.jupiter.MockitoExtension;
++import org.springframework.http.MediaType;
++import org.springframework.test.web.servlet.MockMvc;
++import org.springframework.test.web.servlet.setup.MockMvcBuilders;
++
++import java.util.List;
++
++import static org.junit.jupiter.api.Assertions.assertEquals;
++import static org.junit.jupiter.api.Assertions.assertThrows;
++import static org.mockito.ArgumentMatchers.any;
++import static org.mockito.Mockito.verify;
++import static org.mockito.Mockito.when;
++import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
++import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
++import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
++import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
++import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
++
++/**
++ * Testa só a camada HTTP (rotas, status e JSON), com o serviço simulado.
++ * MockMvc "standalone": sem subir o Spring inteiro nem o banco, como na aula.
++ */
++@ExtendWith(MockitoExtension.class)
++@DisplayName("SalasController")
++class SalasControllerTest {
++
++    private MockMvc mockMvc;
++
++    @Mock
++    private SalasService salasService;
++
++    @InjectMocks
++    private SalasController salasController;
++
++    @BeforeEach
++    void init() {
++        mockMvc = MockMvcBuilders.standaloneSetup(salasController).build();
++    }
++
++    @Test
++    @DisplayName("GET /api/salas/{id} devolve 200 com a sala")
++    void deveBuscarSalaPorId() throws Exception {
++        //mocks
++        when(salasService.buscarPorId(1L)).thenReturn(new SalasDTO(1L, "Sala 101"));
++
++        //impl + asserts
++        mockMvc.perform(get("/api/salas/1"))
++                .andExpect(status().isOk())
++                .andExpect(jsonPath("$.idSala").value(1))
++                .andExpect(jsonPath("$.nome").value("Sala 101"));
++        verify(salasService).buscarPorId(1L);
++    }
++
++    @Test
++    @DisplayName("GET /api/salas devolve a página")
++    void deveListarSalas() throws Exception {
++        //mocks
++        when(salasService.buscarComFiltro(any(), any()))
++                .thenReturn(new PageResponseDTO<>(List.of(new SalasDTO(1L, "Biblioteca")), 1, 0, 1));
++
++        //impl + asserts
++        mockMvc.perform(get("/api/salas").param("page", "0").param("size", "10"))
++                .andExpect(status().isOk())
++                .andExpect(jsonPath("$.totalItens").value(1))
++                .andExpect(jsonPath("$.itens[0].nome").value("Biblioteca"));
++    }
++
++    @Test
++    @DisplayName("POST /api/salas devolve 201 com a sala criada")
++    void deveCriarSala() throws Exception {
++        //mocks
++        when(salasService.criar(any(SalasDTO.class))).thenReturn(new SalasDTO(10L, "Laboratório 1"));
++
++        //impl + asserts
++        mockMvc.perform(post("/api/salas")
++                        .contentType(MediaType.APPLICATION_JSON)
++                        .content("{\"nome\":\"Laboratório 1\"}"))
++                .andExpect(status().isCreated())
++                .andExpect(jsonPath("$.idSala").value(10));
++    }
++
++    @Test
++    @DisplayName("DELETE /api/salas/{id} devolve 204")
++    void deveDeletarSala() throws Exception {
++        //impl + asserts
++        mockMvc.perform(delete("/api/salas/1"))
++                .andExpect(status().isNoContent());
++        verify(salasService).deletar(1L);
++    }
++
++    @Test
++    @DisplayName("erro do serviço não é engolido pelo controller")
++    void devePropagarErroDeSalaInexistente() {
++        //mocks
++        when(salasService.buscarPorId(99L)).thenThrow(new RuntimeException("Sala não encontrada"));
++
++        //impl
++        ServletException erro = assertThrows(ServletException.class,
++                () -> mockMvc.perform(get("/api/salas/99")));
++
++        //asserts
++        assertEquals("Sala não encontrada", erro.getCause().getMessage());
++    }
++}
+diff --git a/src/test/java/br/edu/fiec/helptec/features/salas/service/SalasServiceTest.java b/src/test/java/br/edu/fiec/helptec/features/salas/service/SalasServiceTest.java
+new file mode 100644
+index 0000000..f310c95
+--- /dev/null
++++ b/src/test/java/br/edu/fiec/helptec/features/salas/service/SalasServiceTest.java
+@@ -0,0 +1,144 @@
++package br.edu.fiec.helptec.features.salas.service;
++
++import br.edu.fiec.helptec.features.commons.PageRequestDTO;
++import br.edu.fiec.helptec.features.commons.PageResponseDTO;
++import br.edu.fiec.helptec.features.salas.Salas;
++import br.edu.fiec.helptec.features.salas.model.dto.SalasDTO;
++import br.edu.fiec.helptec.features.salas.model.dto.SalasFilterDTO;
++import br.edu.fiec.helptec.features.salas.repository.SalasRepository;
++import org.junit.jupiter.api.DisplayName;
++import org.junit.jupiter.api.Test;
++import org.junit.jupiter.api.extension.ExtendWith;
++import org.mockito.InjectMocks;
++import org.mockito.Mock;
++import org.mockito.junit.jupiter.MockitoExtension;
++import org.springframework.data.domain.PageImpl;
++import org.springframework.data.domain.PageRequest;
++
++import java.util.List;
++import java.util.Optional;
++
++import static org.junit.jupiter.api.Assertions.assertEquals;
++import static org.junit.jupiter.api.Assertions.assertNull;
++import static org.junit.jupiter.api.Assertions.assertThrows;
++import static org.mockito.ArgumentMatchers.any;
++import static org.mockito.Mockito.never;
++import static org.mockito.Mockito.verify;
++import static org.mockito.Mockito.when;
++
++@ExtendWith(MockitoExtension.class)
++@DisplayName("SalasService")
++class SalasServiceTest {
++
++    @Mock
++    private SalasRepository salasRepository;
++
++    @InjectMocks
++    private SalasService salasService;
++
++    @Test
++    @DisplayName("deve criar sala ignorando o id enviado pelo cliente")
++    void deveCriarSala() {
++        //mocks
++        when(salasRepository.save(any(Salas.class))).thenAnswer(inv -> {
++            Salas sala = inv.getArgument(0);
++            assertNull(sala.getIdSala(), "o id deve ser gerado pelo banco");
++            sala.setIdSala(10L);
++            return sala;
++        });
++
++        //impl
++        SalasDTO resultado = salasService.criar(new SalasDTO(99L, "Laboratório 1"));
++
++        //asserts
++        assertEquals(Long.valueOf(10L), resultado.getIdSala());
++        assertEquals("Laboratório 1", resultado.getNome());
++    }
++
++    @Test
++    @DisplayName("deve buscar sala pelo id")
++    void deveBuscarSalaPorId() {
++        //mocks
++        when(salasRepository.findById(1L)).thenReturn(Optional.of(new Salas(1L, "Sala 101")));
++
++        //impl
++        SalasDTO resultado = salasService.buscarPorId(1L);
++
++        //asserts
++        assertEquals("Sala 101", resultado.getNome());
++    }
++
++    @Test
++    @DisplayName("deve falhar ao buscar sala inexistente")
++    void naoDeveBuscarSalaInexistente() {
++        //mocks
++        when(salasRepository.findById(1L)).thenReturn(Optional.empty());
++
++        //impl
++        RuntimeException erro = assertThrows(RuntimeException.class, () -> salasService.buscarPorId(1L));
++
++        //asserts
++        assertEquals("Sala não encontrada", erro.getMessage());
++    }
++
++    @Test
++    @DisplayName("deve atualizar o nome da sala")
++    void deveAtualizarSala() {
++        //mocks
++        when(salasRepository.findById(1L)).thenReturn(Optional.of(new Salas(1L, "Sala antiga")));
++        when(salasRepository.save(any(Salas.class))).thenAnswer(inv -> inv.getArgument(0));
++
++        //impl
++        SalasDTO resultado = salasService.atualizar(1L, new SalasDTO(null, "Sala nova"));
++
++        //asserts
++        assertEquals(Long.valueOf(1L), resultado.getIdSala());
++        assertEquals("Sala nova", resultado.getNome());
++    }
++
++    @Test
++    @DisplayName("não deve atualizar sala inexistente")
++    void naoDeveAtualizarSalaInexistente() {
++        //mocks
++        when(salasRepository.findById(1L)).thenReturn(Optional.empty());
++
++        //impl + asserts
++        assertThrows(RuntimeException.class, () -> salasService.atualizar(1L, new SalasDTO(null, "X")));
++        verify(salasRepository, never()).save(any());
++    }
++
++    @Test
++    @DisplayName("deve excluir sala existente e recusar inexistente")
++    void deveDeletarSomenteSalaExistente() {
++        //mocks
++        when(salasRepository.existsById(1L)).thenReturn(true);
++        when(salasRepository.existsById(2L)).thenReturn(false);
++
++        //impl
++        salasService.deletar(1L);
++
++        //asserts
++        verify(salasRepository).deleteById(1L);
++        assertThrows(RuntimeException.class, () -> salasService.deletar(2L));
++        verify(salasRepository, never()).deleteById(2L);
++    }
++
++    @Test
++    @DisplayName("deve paginar a busca de salas")
++    void deveBuscarComFiltro() {
++        //mocks
++        SalasFilterDTO filtro = new SalasFilterDTO();
++        PageRequestDTO pagina = new PageRequestDTO(1, 1);
++        when(salasRepository.buscarGenerica(filtro, pagina))
++                .thenReturn(new PageImpl<>(List.of(new Salas(2L, "Biblioteca")), PageRequest.of(1, 1), 3));
++
++        //impl
++        PageResponseDTO<SalasDTO> resultado = salasService.buscarComFiltro(filtro, pagina);
++
++        //asserts
++        assertEquals(1, resultado.getItens().size());
++        assertEquals(3, resultado.getTotalItens());
++        assertEquals(1, resultado.getPaginaAtual());
++        assertEquals(3, resultado.getTotalPaginas());
++    }
++}
+diff --git a/src/test/java/br/edu/fiec/helptec/features/skill/service/SkillServiceTest.java b/src/test/java/br/edu/fiec/helptec/features/skill/service/SkillServiceTest.java
+new file mode 100644
+index 0000000..d969b5f
+--- /dev/null
++++ b/src/test/java/br/edu/fiec/helptec/features/skill/service/SkillServiceTest.java
+@@ -0,0 +1,156 @@
++package br.edu.fiec.helptec.features.skill.service;
++
++import br.edu.fiec.helptec.features.skill.Skill;
++import br.edu.fiec.helptec.features.skill.UsuarioSkill;
++import br.edu.fiec.helptec.features.skill.model.dto.SkillDTO;
++import br.edu.fiec.helptec.features.skill.repository.SkillRepository;
++import br.edu.fiec.helptec.features.skill.repository.UsuarioSkillRepository;
++import br.edu.fiec.helptec.features.usuario.model.dto.UsuarioResponseDTO;
++import br.edu.fiec.helptec.features.usuario.model.entity.UserRole;
++import br.edu.fiec.helptec.features.usuario.model.entity.UsuarioEntity;
++import br.edu.fiec.helptec.features.usuario.repository.UsuarioRepository;
++import br.edu.fiec.helptec.support.Fabrica;
++import org.junit.jupiter.api.DisplayName;
++import org.junit.jupiter.api.Test;
++import org.junit.jupiter.api.extension.ExtendWith;
++import org.mockito.ArgumentCaptor;
++import org.mockito.InjectMocks;
++import org.mockito.Mock;
++import org.mockito.junit.jupiter.MockitoExtension;
++
++import java.util.List;
++import java.util.Optional;
++import java.util.UUID;
++
++import static org.junit.jupiter.api.Assertions.assertEquals;
++import static org.junit.jupiter.api.Assertions.assertThrows;
++import static org.mockito.ArgumentMatchers.any;
++import static org.mockito.Mockito.never;
++import static org.mockito.Mockito.verify;
++import static org.mockito.Mockito.when;
++
++@ExtendWith(MockitoExtension.class)
++@DisplayName("SkillService")
++class SkillServiceTest {
++
++    private static final Long ID_SKILL = 3L;
++
++    @Mock
++    private SkillRepository skillRepository;
++
++    @Mock
++    private UsuarioSkillRepository usuarioSkillRepository;
++
++    @Mock
++    private UsuarioRepository usuarioRepository;
++
++    @InjectMocks
++    private SkillService skillService;
++
++    private static UsuarioSkill vinculo(UUID idUsuario, Long idSkill) {
++        UsuarioSkill us = new UsuarioSkill();
++        us.setIdUsuario(idUsuario);
++        us.setIdSkill(idSkill);
++        return us;
++    }
++
++    @Test
++    @DisplayName("deve atribuir skill a um usuário de suporte")
++    void deveAtribuirSkillAoSuporte() {
++        //mocks
++        UsuarioEntity suporte = Fabrica.usuario(UserRole.SUPORTE);
++        when(usuarioRepository.findById(suporte.getId())).thenReturn(Optional.of(suporte));
++        when(skillRepository.existsById(ID_SKILL)).thenReturn(true);
++        when(usuarioSkillRepository.existsByIdUsuarioAndIdSkill(suporte.getId(), ID_SKILL)).thenReturn(false);
++
++        //impl
++        skillService.atribuirSkill(suporte.getId(), ID_SKILL);
++
++        //asserts
++        ArgumentCaptor<UsuarioSkill> captor = ArgumentCaptor.forClass(UsuarioSkill.class);
++        verify(usuarioSkillRepository).save(captor.capture());
++        assertEquals(suporte.getId(), captor.getValue().getIdUsuario());
++        assertEquals(ID_SKILL, captor.getValue().getIdSkill());
++    }
++
++    @Test
++    @DisplayName("não deve duplicar uma skill já atribuída")
++    void naoDeveDuplicarSkill() {
++        //mocks
++        UsuarioEntity suporte = Fabrica.usuario(UserRole.SUPORTE);
++        when(usuarioRepository.findById(suporte.getId())).thenReturn(Optional.of(suporte));
++        when(skillRepository.existsById(ID_SKILL)).thenReturn(true);
++        when(usuarioSkillRepository.existsByIdUsuarioAndIdSkill(suporte.getId(), ID_SKILL)).thenReturn(true);
++
++        //impl
++        skillService.atribuirSkill(suporte.getId(), ID_SKILL);
++
++        //asserts
++        verify(usuarioSkillRepository, never()).save(any());
++    }
++
++    @Test
++    @DisplayName("não deve atribuir skill a quem não é do suporte")
++    void naoDeveAtribuirSkillParaQuemNaoESuporte() {
++        //mocks
++        UsuarioEntity usuario = Fabrica.usuario(UserRole.USER);
++        when(usuarioRepository.findById(usuario.getId())).thenReturn(Optional.of(usuario));
++
++        //impl
++        IllegalStateException erro = assertThrows(IllegalStateException.class,
++                () -> skillService.atribuirSkill(usuario.getId(), ID_SKILL));
++
++        //asserts
++        assertEquals("Somente usuários com papel SUPORTE podem receber skills", erro.getMessage());
++        verify(usuarioSkillRepository, never()).save(any());
++    }
++
++    @Test
++    @DisplayName("não deve atribuir skill inexistente")
++    void naoDeveAtribuirSkillInexistente() {
++        //mocks
++        UsuarioEntity suporte = Fabrica.usuario(UserRole.SUPORTE);
++        when(usuarioRepository.findById(suporte.getId())).thenReturn(Optional.of(suporte));
++        when(skillRepository.existsById(ID_SKILL)).thenReturn(false);
++
++        //impl + asserts
++        RuntimeException erro = assertThrows(RuntimeException.class,
++                () -> skillService.atribuirSkill(suporte.getId(), ID_SKILL));
++        assertEquals("Skill não encontrada", erro.getMessage());
++    }
++
++    @Test
++    @DisplayName("na triagem, deve listar só usuários de suporte com a skill")
++    void deveListarSomenteSuportesComASkill() {
++        //mocks
++        UsuarioEntity suporte = Fabrica.usuario(UserRole.SUPORTE);
++        UsuarioEntity exSuporte = Fabrica.usuario(UserRole.USER); // perdeu o papel, mas ficou o vínculo
++        when(usuarioSkillRepository.findByIdSkill(ID_SKILL))
++                .thenReturn(List.of(vinculo(suporte.getId(), ID_SKILL), vinculo(exSuporte.getId(), ID_SKILL)));
++        when(usuarioRepository.findAllById(List.of(suporte.getId(), exSuporte.getId())))
++                .thenReturn(List.of(suporte, exSuporte));
++
++        //impl
++        List<UsuarioResponseDTO> resultado = skillService.listarSuportesPorSkill(ID_SKILL);
++
++        //asserts
++        assertEquals(1, resultado.size());
++        assertEquals(suporte.getId(), resultado.get(0).getIdUsuario());
++    }
++
++    @Test
++    @DisplayName("deve listar as skills de um usuário")
++    void deveListarSkillsDoUsuario() {
++        //mocks
++        UUID idUsuario = UUID.randomUUID();
++        when(usuarioSkillRepository.findByIdUsuario(idUsuario)).thenReturn(List.of(vinculo(idUsuario, ID_SKILL)));
++        when(skillRepository.findAllById(List.of(ID_SKILL))).thenReturn(List.of(new Skill(ID_SKILL, "REDE")));
++
++        //impl
++        List<SkillDTO> resultado = skillService.listarSkillsDoUsuario(idUsuario);
++
++        //asserts
++        assertEquals(1, resultado.size());
++        assertEquals("REDE", resultado.get(0).getNome());
++    }
++}
+diff --git a/src/test/java/br/edu/fiec/helptec/features/usuario/service/UsuarioServiceImplTest.java b/src/test/java/br/edu/fiec/helptec/features/usuario/service/UsuarioServiceImplTest.java
+new file mode 100644
+index 0000000..a533818
+--- /dev/null
++++ b/src/test/java/br/edu/fiec/helptec/features/usuario/service/UsuarioServiceImplTest.java
+@@ -0,0 +1,139 @@
++package br.edu.fiec.helptec.features.usuario.service;
++
++import br.edu.fiec.helptec.features.commons.PageRequestDTO;
++import br.edu.fiec.helptec.features.commons.PageResponseDTO;
++import br.edu.fiec.helptec.features.usuario.model.dto.CreateUsuarioRequestDTO;
++import br.edu.fiec.helptec.features.usuario.model.dto.UsuarioResponseDTO;
++import br.edu.fiec.helptec.features.usuario.model.entity.UserRole;
++import br.edu.fiec.helptec.features.usuario.model.entity.UsuarioEntity;
++import br.edu.fiec.helptec.features.usuario.repository.UsuarioRepository;
++import br.edu.fiec.helptec.features.usuario.service.impl.UsuarioServiceImpl;
++import br.edu.fiec.helptec.support.Fabrica;
++import org.junit.jupiter.api.DisplayName;
++import org.junit.jupiter.api.Test;
++import org.junit.jupiter.api.extension.ExtendWith;
++import org.mockito.ArgumentCaptor;
++import org.mockito.InjectMocks;
++import org.mockito.Mock;
++import org.mockito.junit.jupiter.MockitoExtension;
++import org.springframework.data.domain.PageImpl;
++import org.springframework.data.domain.PageRequest;
++import org.springframework.data.domain.Pageable;
++import org.springframework.security.core.userdetails.UsernameNotFoundException;
++
++import java.util.List;
++import java.util.Optional;
++import java.util.UUID;
++
++import static org.junit.jupiter.api.Assertions.assertEquals;
++import static org.junit.jupiter.api.Assertions.assertThrows;
++import static org.mockito.ArgumentMatchers.any;
++import static org.mockito.Mockito.never;
++import static org.mockito.Mockito.verify;
++import static org.mockito.Mockito.when;
++
++@ExtendWith(MockitoExtension.class)
++@DisplayName("UsuarioServiceImpl")
++class UsuarioServiceImplTest {
++
++    @Mock
++    private UsuarioRepository usuarioRepository;
++
++    @InjectMocks
++    private UsuarioServiceImpl usuarioService;
++
++    private static CreateUsuarioRequestDTO request(String nome, String email, String senha) {
++        CreateUsuarioRequestDTO request = new CreateUsuarioRequestDTO();
++        request.setNome(nome);
++        request.setEmail(email);
++        request.setSenha(senha);
++        return request;
++    }
++
++    @Test
++    @DisplayName("todo usuário novo entra com o papel USER")
++    void deveCriarUsuarioComPapelUser() {
++        //mocks
++        when(usuarioRepository.save(any(UsuarioEntity.class))).thenAnswer(inv -> inv.getArgument(0));
++
++        //impl
++        UsuarioResponseDTO resultado = usuarioService.criar(request("Ana", "ana@fiec.edu.br", "123456"));
++
++        //asserts
++        ArgumentCaptor<UsuarioEntity> captor = ArgumentCaptor.forClass(UsuarioEntity.class);
++        verify(usuarioRepository).save(captor.capture());
++        assertEquals(UserRole.USER, captor.getValue().getRole());
++        assertEquals("ana@fiec.edu.br", resultado.getEmail());
++        assertEquals(UserRole.USER, resultado.getTipoPermissao());
++    }
++
++    @Test
++    @DisplayName("deve devolver a página de usuários com os totais")
++    void deveListarPaginado() {
++        //mocks
++        List<UsuarioEntity> usuarios = List.of(Fabrica.usuario(UserRole.USER), Fabrica.usuario(UserRole.SUPORTE));
++        when(usuarioRepository.findAll(any(Pageable.class)))
++                .thenReturn(new PageImpl<>(usuarios, PageRequest.of(0, 2), 3));
++
++        //impl
++        PageResponseDTO<UsuarioResponseDTO> resultado = usuarioService.listarPaginado(new PageRequestDTO(0, 2));
++
++        //asserts
++        assertEquals(2, resultado.getItens().size());
++        assertEquals(3, resultado.getTotalItens());
++        assertEquals(0, resultado.getPaginaAtual());
++        assertEquals(2, resultado.getTotalPaginas());
++    }
++
++    @Test
++    @DisplayName("ao atualizar com senha em branco, mantém a senha atual")
++    void deveManterSenhaQuandoNaoInformada() {
++        //mocks
++        UsuarioEntity existente = Fabrica.usuario(UserRole.USER);
++        when(usuarioRepository.findById(existente.getId())).thenReturn(Optional.of(existente));
++        when(usuarioRepository.save(any(UsuarioEntity.class))).thenAnswer(inv -> inv.getArgument(0));
++
++        //impl
++        UsuarioResponseDTO resultado = usuarioService.atualizar(existente.getId(), request("Ana Maria", "ana@fiec.edu.br", " "));
++
++        //asserts
++        assertEquals("Ana Maria", resultado.getNome());
++        assertEquals("senha-criptografada", existente.getPassword());
++    }
++
++    @Test
++    @DisplayName("deve falhar ao buscar usuário inexistente")
++    void naoDeveBuscarUsuarioInexistente() {
++        //mocks
++        UUID id = UUID.randomUUID();
++        when(usuarioRepository.findById(id)).thenReturn(Optional.empty());
++
++        //impl
++        RuntimeException erro = assertThrows(RuntimeException.class, () -> usuarioService.buscarPorId(id));
++
++        //asserts
++        assertEquals("Usuário não encontrado com o ID: " + id, erro.getMessage());
++    }
++
++    @Test
++    @DisplayName("não deve excluir usuário inexistente")
++    void naoDeveDeletarUsuarioInexistente() {
++        //mocks
++        UUID id = UUID.randomUUID();
++        when(usuarioRepository.existsById(id)).thenReturn(false);
++
++        //impl + asserts
++        assertThrows(RuntimeException.class, () -> usuarioService.deletar(id));
++        verify(usuarioRepository, never()).deleteById(any());
++    }
++
++    @Test
++    @DisplayName("login: e-mail desconhecido gera UsernameNotFoundException")
++    void deveFalharLoginComEmailDesconhecido() {
++        //mocks
++        when(usuarioRepository.findByEmail("x@fiec.edu.br")).thenReturn(Optional.empty());
++
++        //impl + asserts
++        assertThrows(UsernameNotFoundException.class, () -> usuarioService.loadUserByUsername("x@fiec.edu.br"));
++    }
++}
+diff --git a/src/test/java/br/edu/fiec/helptec/support/Fabrica.java b/src/test/java/br/edu/fiec/helptec/support/Fabrica.java
+new file mode 100644
+index 0000000..6841b04
+--- /dev/null
++++ b/src/test/java/br/edu/fiec/helptec/support/Fabrica.java
+@@ -0,0 +1,51 @@
++package br.edu.fiec.helptec.support;
++
++import br.edu.fiec.helptec.features.chamado.Chamado;
++import br.edu.fiec.helptec.features.chamado.StatusChamado;
++import br.edu.fiec.helptec.features.usuario.model.entity.UserRole;
++import br.edu.fiec.helptec.features.usuario.model.entity.UsuarioEntity;
++
++import java.time.LocalDate;
++import java.util.UUID;
++
++/**
++ * Fábrica de objetos para os testes (padrão "Test Data Builder").
++ * Centraliza a criação dos dados para que cada teste mostre só o que importa nele.
++ */
++public final class Fabrica {
++
++    public static final String AREA = "Informática";
++
++    private Fabrica() {
++    }
++
++    public static UsuarioEntity usuario(UserRole role) {
++        return usuario(UUID.randomUUID(), role);
++    }
++
++    public static UsuarioEntity usuario(UUID id, UserRole role) {
++        UsuarioEntity usuario = new UsuarioEntity();
++        usuario.setId(id);
++        usuario.setNome("Usuário " + role.name());
++        usuario.setEmail(role.name().toLowerCase() + "@helptec.local");
++        usuario.setPassword("senha-criptografada");
++        usuario.setRole(role);
++        usuario.setArea(AREA);
++        return usuario;
++    }
++
++    public static Chamado chamado(Long id, UUID idSolicitante, StatusChamado status) {
++        return Chamado.builder()
++                .idChamado(id)
++                .idUsuario(idSolicitante)
++                .area(AREA)
++                .descricao("[Hardware] Computador não liga\nO PC da mesa 3 não liga.")
++                .prioridade("ALTA")
++                .criticidade("ALTA")
++                .status(status)
++                .dataAbertura(LocalDate.now().minusDays(1))
++                .idSala(1L)
++                .idEquipamento(2L)
++                .build();
++    }
++}
+-- 
+2.43.0
+

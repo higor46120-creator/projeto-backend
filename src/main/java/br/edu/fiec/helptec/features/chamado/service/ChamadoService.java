@@ -68,6 +68,11 @@ public class ChamadoService {
         chamado.setDataFinal(null);
         chamado.setResolucao(null);
 
+        // Sala e equipamento: o cadastro (id) tem prioridade; sem id, guarda o texto digitado
+        chamado.setSalaInformada(chamado.getIdSala() != null ? null : textoOuNulo(dto.getSalaInformada()));
+        chamado.setEquipamentoInformado(
+                chamado.getIdEquipamento() != null ? null : textoOuNulo(dto.getEquipamentoInformado()));
+
         return toDTO(chamadoRepository.save(chamado));
     }
 
@@ -92,6 +97,8 @@ public class ChamadoService {
                 dto.setCriticidade(linha.getCriticidade());
                 dto.setIdEquipamento(linha.getIdEquipamento());
                 dto.setIdSala(linha.getIdSala());
+                dto.setSalaInformada(linha.getSalaInformada());
+                dto.setEquipamentoInformado(linha.getEquipamentoInformado());
 
                 criados.add(criar(dto));
             }
@@ -106,7 +113,7 @@ public class ChamadoService {
     public ChamadoDTO aprovar(Long idChamado, UUID idUsuarioLogado) {
         Chamado chamado = buscarOuFalhar(idChamado);
         validarStatus(chamado, StatusChamado.AGUARDANDO_APROVACAO);
-        chamado.setIdUsuario(idUsuarioLogado);
+        // idUsuario continua sendo o solicitante; não sobrescrever com o aprovador
         chamado.setStatus(StatusChamado.APROVADO);
         return toDTO(chamadoRepository.save(chamado));
     }
@@ -134,6 +141,23 @@ public class ChamadoService {
         }
 
         chamado.setIdSuporte(idSuporte);
+        chamado.setStatus(StatusChamado.EM_ATENDIMENTO);
+        return toDTO(chamadoRepository.save(chamado));
+    }
+
+    // ---------------------------------------------------------
+    // 3b. Suporte assume um chamado aprovado ("Iniciar Atendimento"):
+    //     o próprio usuário logado vira o suporte do chamado
+    // ---------------------------------------------------------
+    public ChamadoDTO iniciarAtendimento(Long idChamado, UsuarioEntity suporte) {
+        Chamado chamado = buscarOuFalhar(idChamado);
+        validarStatus(chamado, StatusChamado.APROVADO);
+
+        if (suporte.getRole() != UserRole.SUPORTE && suporte.getRole() != UserRole.ADMIN) {
+            throw new IllegalStateException("Só usuários de suporte podem iniciar o atendimento");
+        }
+
+        chamado.setIdSuporte(suporte.getId());
         chamado.setStatus(StatusChamado.EM_ATENDIMENTO);
         return toDTO(chamadoRepository.save(chamado));
     }
@@ -178,8 +202,15 @@ public class ChamadoService {
         return new ChamadoDTO(
                 c.getIdChamado(), c.getIdUsuario(), c.getArea(), c.getIdSuporte(),
                 c.getDescricao(), c.getStatus(), c.getPrioridade(), c.getCriticidade(),
-                c.getDataAbertura(), c.getDataFinal(), c.getResolucao(), c.getIdEquipamento(), c.getIdSala()
+                c.getDataAbertura(), c.getDataFinal(), c.getResolucao(), c.getIdEquipamento(), c.getIdSala(),
+                c.getSalaInformada(), c.getEquipamentoInformado()
         );
+    }
+
+    /** Texto sem espaços nas pontas; vazio vira null. */
+    private static String textoOuNulo(String texto) {
+        if (texto == null || texto.isBlank()) return null;
+        return texto.trim();
     }
 
     private Chamado toEntity(ChamadoDTO dto) {

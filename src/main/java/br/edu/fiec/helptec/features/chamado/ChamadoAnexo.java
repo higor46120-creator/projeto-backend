@@ -1,21 +1,25 @@
 package br.edu.fiec.helptec.features.chamado;
 
-import jakarta.persistence.*;
+import br.edu.fiec.helptec.config.mongo.GeneratedId;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.mapping.Document;
+import org.springframework.data.mongodb.core.index.Indexed;
+
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-@Entity
-@Table(name = "tb_chamado_anexo")
+@Document(collection = "chamado_anexos")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 public class ChamadoAnexo {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @GeneratedId
     private Long idAnexo;
 
+    @Indexed
     private Long idChamado;
     private String url;
     private String tipo;          // "IMAGEM" ou "VIDEO"

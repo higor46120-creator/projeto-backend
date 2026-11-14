@@ -54,7 +54,10 @@ public class EquipamentoService {
 
         existente.setNome(dto.getNome());
         existente.setPatrimonio(dto.getPatrimonio());
-        existente.setStatus(dto.getStatus());
+        existente.setStatus(statusOuPadrao(dto.getStatus()));
+        existente.setArea(dto.getArea());
+        existente.setIdSala(dto.getIdSala());
+        existente.setDescricao(dto.getDescricao());
         existente.setTipo(dto.getTipo());
         existente.setPreco(dto.getPreco());
 
@@ -72,10 +75,17 @@ public class EquipamentoService {
 
     // METODOS AUXILIARES DE CONVERSÃO (Faltando na sua classe)
     private EquipamentoDTO toDTO(Equipamento e) {
-        return new EquipamentoDTO(e.getId(), e.getNome(), e.getPatrimonio(), e.getStatus(), e.getTipo(), e.getPreco());
+        return new EquipamentoDTO(e.getId(), e.getNome(), e.getPatrimonio(), e.getStatus(), e.getTipo(), e.getPreco(),
+                e.getArea(), e.getIdSala(), e.getDescricao());
     }
 
     private Equipamento toEntity(EquipamentoDTO dto) {
-        return new Equipamento(dto.getId(), dto.getNome(), dto.getPatrimonio(), dto.getStatus(), dto.getTipo(), dto.getPreco());
+        return new Equipamento(dto.getId(), dto.getNome(), dto.getPatrimonio(), statusOuPadrao(dto.getStatus()),
+                dto.getTipo(), dto.getPreco(), dto.getArea(), dto.getIdSala(), dto.getDescricao());
+    }
+
+    // Sem status informado, o equipamento começa como OPERACIONAL
+    private String statusOuPadrao(String status) {
+        return (status == null || status.isBlank()) ? "OPERACIONAL" : status;
     }
 }

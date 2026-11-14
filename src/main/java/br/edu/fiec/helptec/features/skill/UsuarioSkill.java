@@ -1,7 +1,11 @@
 package br.edu.fiec.helptec.features.skill;
 
+import br.edu.fiec.helptec.config.mongo.GeneratedId;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.mapping.Document;
+import org.springframework.data.mongodb.core.index.CompoundIndex;
+
 import br.edu.fiec.helptec.features.commons.AuditBaseEntity;
-import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -10,8 +14,8 @@ import lombok.NoArgsConstructor;
 import java.util.UUID;
 
 // Associação N:N — um usuário de suporte pode ter várias skills.
-@Entity
-@Table(name = "tb_usuario_skill", uniqueConstraints = @UniqueConstraint(columnNames = {"idUsuario", "idSkill"}))
+@Document(collection = "usuario_skills")
+@CompoundIndex(name = "usuario_skill_unico", def = "{'idUsuario': 1, 'idSkill': 1}", unique = true)
 @Data
 @EqualsAndHashCode(callSuper = false)
 @NoArgsConstructor
@@ -19,7 +23,7 @@ import java.util.UUID;
 public class UsuarioSkill extends AuditBaseEntity {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @GeneratedId
     private Long idUsuarioSkill;
 
     private UUID idUsuario;

@@ -1,0 +1,22 @@
+# =====================================================================
+# Perfil "professor": banco MongoDB (Atlas) disponibilizado pelo professor.
+# Ativar: SPRING_PROFILES_ACTIVE=professor
+#
+# A string de conexão NÃO fica aqui (repositório público). Defina no .env
+# ou nas variáveis de ambiente:
+#   MONGODB_URI=mongodb+srv://<usuario>:<senha>@<cluster>/?retryWrites=true&w=majority
+#   MONGODB_DATABASE=helptec
+# Sem MONGODB_URI o sistema não sobe (de propósito, para não cair no banco local).
+#
+# Atenção: a rede da FIEC pode bloquear a porta 27017 do Atlas; teste com
+#   Test-NetConnection <host-do-cluster> -Port 27017
+# e confira se o seu IP está liberado em Network Access no Atlas.
+# =====================================================================
+spring:
+  mongodb:
+    uri: ${MONGODB_URI}
+    database: ${MONGODB_DATABASE:helptec}
+
+app:
+  seed:
+    enabled: false

@@ -1,0 +1,324 @@
+From d3ff2d44a6ff431ab7b29ed9efddaaeb570fbab6 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sat, 14 Nov 2026 10:40:16 -0300
+Subject: [PATCH] =?UTF-8?q?Ajustes=20para=20o=20front:=20CORS=20configur?=
+ =?UTF-8?q?=C3=A1vel=20e=20novos=20campos=20do=20equipamento?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+- CORS lido de CORS_ALLOWED_ORIGINS (app.cors.allowed-origins), padrão *
+- Equipamento ganha area, idSala e descricao (tela de equipamentos do front);
+  status padrão OPERACIONAL; busca e filtros pelos novos campos
+- @NonNull do pacote interno do Firebase trocado pelo jspecify
+- Leitura opcional de .env; Ingress com https no deployment.yaml
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_012xpyFRPS2vqxyuCv6P8vvC
+---
+ deployment.yaml                               | 39 +++++++++++++++++++
+ .../config/JwtAuthenticationFilter.java       |  2 +-
+ .../fiec/helptec/config/SecurityConfig.java   | 10 ++++-
+ .../features/equipamento/Equipamento.java     |  7 ++++
+ .../equipamento/model/dto/EquipamentoDTO.java |  4 +-
+ .../model/dto/EquipamentoFilterDTO.java       |  2 +
+ .../impl/EquipamentoRepositoryCustomImpl.java | 13 ++++++-
+ .../service/EquipamentoService.java           | 16 ++++++--
+ src/main/resources/application.yaml           |  7 ++++
+ .../service/EquipamentoServiceTest.java       | 29 ++++++++++++--
+ 10 files changed, 118 insertions(+), 11 deletions(-)
+
+diff --git a/deployment.yaml b/deployment.yaml
+index 7a9d08d..8b8d153 100644
+--- a/deployment.yaml
++++ b/deployment.yaml
+@@ -7,6 +7,8 @@ data:
+   DB_HOST: "host.minikube.internal"
+   DB_PORT: "3310"
+   DB_NAME: "helptec"
++  # Endereço do site (front) que pode chamar a API. TROQUE pelo domínio de vocês.
++  CORS_ALLOWED_ORIGINS: "https://helptec.SEU-DOMINIO"
+   DB_USER: "root"
+   # Troque pelo bucket do seu projeto (Firebase Console > Storage)
+   FIREBASE_STORAGE_BUCKET: "SEU-PROJETO.firebasestorage.app"
+@@ -143,3 +145,40 @@ spec:
+       port: 80
+       targetPort: 80
+       nodePort: 30081
++
++---
++# Entrada pelo domínio com https (o Google só aceita https ou localhost).
++# No minikube, ative antes:  minikube addons enable ingress
++# Certificado:  kubectl create secret tls helptech-tls --cert=certificado.crt --key=chave.key
++apiVersion: networking.k8s.io/v1
++kind: Ingress
++metadata:
++  name: helptech-ingress
++spec:
++  ingressClassName: nginx
++  tls:
++    - hosts:
++        - helptec.SEU-DOMINIO       # TROQUE
++        - api.helptec.SEU-DOMINIO   # TROQUE
++      secretName: helptech-tls
++  rules:
++    - host: helptec.SEU-DOMINIO     # TROQUE
++      http:
++        paths:
++          - path: /
++            pathType: Prefix
++            backend:
++              service:
++                name: helptech-frontend-service
++                port:
++                  number: 80
++    - host: api.helptec.SEU-DOMINIO # TROQUE
++      http:
++        paths:
++          - path: /
++            pathType: Prefix
++            backend:
++              service:
++                name: helptech-backend-service
++                port:
++                  number: 8080
+diff --git a/src/main/java/br/edu/fiec/helptec/config/JwtAuthenticationFilter.java b/src/main/java/br/edu/fiec/helptec/config/JwtAuthenticationFilter.java
+index e1ad3a4..f70a6a7 100644
+--- a/src/main/java/br/edu/fiec/helptec/config/JwtAuthenticationFilter.java
++++ b/src/main/java/br/edu/fiec/helptec/config/JwtAuthenticationFilter.java
+@@ -1,6 +1,6 @@
+ package br.edu.fiec.helptec.config;
+ 
+-import com.google.firebase.internal.NonNull;
++import org.jspecify.annotations.NonNull;
+ import io.jsonwebtoken.JwtException;
+ import jakarta.servlet.FilterChain;
+ import jakarta.servlet.ServletException;
+diff --git a/src/main/java/br/edu/fiec/helptec/config/SecurityConfig.java b/src/main/java/br/edu/fiec/helptec/config/SecurityConfig.java
+index 99e083d..e9be754 100644
+--- a/src/main/java/br/edu/fiec/helptec/config/SecurityConfig.java
++++ b/src/main/java/br/edu/fiec/helptec/config/SecurityConfig.java
+@@ -111,10 +111,18 @@ public class SecurityConfig {
+         return http.build();
+     }
+ 
++    // Endereços do front que podem chamar a API, separados por vírgula
++    // (CORS_ALLOWED_ORIGINS). "*" libera qualquer endereço.
++    @Value("${app.cors.allowed-origins:*}")
++    private String allowedOrigins;
++
+     @Bean
+     public CorsConfigurationSource corsConfigurationSource() {
+         CorsConfiguration configuration = new CorsConfiguration();
+-        configuration.setAllowedOrigins(List.of("*"));
++        configuration.setAllowedOriginPatterns(java.util.Arrays.stream(allowedOrigins.split(","))
++                .map(String::trim)
++                .filter(origem -> !origem.isEmpty())
++                .toList());
+         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
+         configuration.setAllowedHeaders(List.of("*"));
+         configuration.setAllowCredentials(false);
+diff --git a/src/main/java/br/edu/fiec/helptec/features/equipamento/Equipamento.java b/src/main/java/br/edu/fiec/helptec/features/equipamento/Equipamento.java
+index 8ab6b48..d3b4b98 100644
+--- a/src/main/java/br/edu/fiec/helptec/features/equipamento/Equipamento.java
++++ b/src/main/java/br/edu/fiec/helptec/features/equipamento/Equipamento.java
+@@ -1,5 +1,6 @@
+ package br.edu.fiec.helptec.features.equipamento;
+ 
++import jakarta.persistence.Column;
+ 
+ import br.edu.fiec.helptec.features.commons.AuditBaseEntity;
+ import jakarta.persistence.Entity;
+@@ -27,4 +28,10 @@ public class Equipamento extends AuditBaseEntity {
+     private String tipo;//tipo
+     private Double preco;
+ 
++    // Campos da tela de equipamentos do front (Suporte)
++    private String area;      // setor/área onde o equipamento fica
++    private Long idSala;      // sala (tb_salas) onde o equipamento está
++
++    @Column(length = 1000)
++    private String descricao;
+ }
+diff --git a/src/main/java/br/edu/fiec/helptec/features/equipamento/model/dto/EquipamentoDTO.java b/src/main/java/br/edu/fiec/helptec/features/equipamento/model/dto/EquipamentoDTO.java
+index 7663115..6acfcca 100644
+--- a/src/main/java/br/edu/fiec/helptec/features/equipamento/model/dto/EquipamentoDTO.java
++++ b/src/main/java/br/edu/fiec/helptec/features/equipamento/model/dto/EquipamentoDTO.java
+@@ -14,5 +14,7 @@ public class EquipamentoDTO {
+     private String status;
+     private String tipo;
+     private Double preco;
+-
++    private String area;
++    private Long idSala;
++    private String descricao;
+ }
+diff --git a/src/main/java/br/edu/fiec/helptec/features/equipamento/model/dto/EquipamentoFilterDTO.java b/src/main/java/br/edu/fiec/helptec/features/equipamento/model/dto/EquipamentoFilterDTO.java
+index f4c5a88..208baf4 100644
+--- a/src/main/java/br/edu/fiec/helptec/features/equipamento/model/dto/EquipamentoFilterDTO.java
++++ b/src/main/java/br/edu/fiec/helptec/features/equipamento/model/dto/EquipamentoFilterDTO.java
+@@ -16,4 +16,6 @@ public class EquipamentoFilterDTO {
+     private String tipo;
+     private Double precoMin;
+     private Double precoMax;
++    private String area;
++    private Long idSala;
+ }
+diff --git a/src/main/java/br/edu/fiec/helptec/features/equipamento/repository/impl/EquipamentoRepositoryCustomImpl.java b/src/main/java/br/edu/fiec/helptec/features/equipamento/repository/impl/EquipamentoRepositoryCustomImpl.java
+index 50f3025..a459ce6 100644
+--- a/src/main/java/br/edu/fiec/helptec/features/equipamento/repository/impl/EquipamentoRepositoryCustomImpl.java
++++ b/src/main/java/br/edu/fiec/helptec/features/equipamento/repository/impl/EquipamentoRepositoryCustomImpl.java
+@@ -82,7 +82,10 @@ public class EquipamentoRepositoryCustomImpl implements EquipamentoRepositoryCus
+             Predicate nomeLike = cb.like(cb.lower(root.get("nome")), pattern);
+             Predicate patrimonioLike = cb.like(cb.lower(root.get("patrimonio")), pattern);
+             Predicate statusLike = cb.like(cb.lower(root.get("status")), pattern);
+-            predicates.add(cb.or(nomeLike, patrimonioLike, statusLike));
++            Predicate tipoLike = cb.like(cb.lower(root.get("tipo")), pattern);
++            Predicate areaLike = cb.like(cb.lower(root.get("area")), pattern);
++            Predicate descricaoLike = cb.like(cb.lower(root.get("descricao")), pattern);
++            predicates.add(cb.or(nomeLike, patrimonioLike, statusLike, tipoLike, areaLike, descricaoLike));
+         }
+ 
+         // Filtros específicos
+@@ -102,6 +105,14 @@ public class EquipamentoRepositoryCustomImpl implements EquipamentoRepositoryCus
+             predicates.add(cb.like(cb.lower(root.get("tipo")), "%" + filtro.getTipo().toLowerCase() + "%"));
+         }
+ 
++        if (filtro.getArea() != null && !filtro.getArea().trim().isEmpty()) {
++            predicates.add(cb.like(cb.lower(root.get("area")), "%" + filtro.getArea().toLowerCase() + "%"));
++        }
++
++        if (filtro.getIdSala() != null) {
++            predicates.add(cb.equal(root.get("idSala"), filtro.getIdSala()));
++        }
++
+         if (filtro.getPrecoMin() != null) {
+             predicates.add(cb.greaterThanOrEqualTo(root.get("preco"), filtro.getPrecoMin()));
+         }
+diff --git a/src/main/java/br/edu/fiec/helptec/features/equipamento/service/EquipamentoService.java b/src/main/java/br/edu/fiec/helptec/features/equipamento/service/EquipamentoService.java
+index 4adde32..3a97b7a 100644
+--- a/src/main/java/br/edu/fiec/helptec/features/equipamento/service/EquipamentoService.java
++++ b/src/main/java/br/edu/fiec/helptec/features/equipamento/service/EquipamentoService.java
+@@ -54,7 +54,10 @@ public class EquipamentoService {
+ 
+         existente.setNome(dto.getNome());
+         existente.setPatrimonio(dto.getPatrimonio());
+-        existente.setStatus(dto.getStatus());
++        existente.setStatus(statusOuPadrao(dto.getStatus()));
++        existente.setArea(dto.getArea());
++        existente.setIdSala(dto.getIdSala());
++        existente.setDescricao(dto.getDescricao());
+         existente.setTipo(dto.getTipo());
+         existente.setPreco(dto.getPreco());
+ 
+@@ -72,10 +75,17 @@ public class EquipamentoService {
+ 
+     // METODOS AUXILIARES DE CONVERSÃO (Faltando na sua classe)
+     private EquipamentoDTO toDTO(Equipamento e) {
+-        return new EquipamentoDTO(e.getId(), e.getNome(), e.getPatrimonio(), e.getStatus(), e.getTipo(), e.getPreco());
++        return new EquipamentoDTO(e.getId(), e.getNome(), e.getPatrimonio(), e.getStatus(), e.getTipo(), e.getPreco(),
++                e.getArea(), e.getIdSala(), e.getDescricao());
+     }
+ 
+     private Equipamento toEntity(EquipamentoDTO dto) {
+-        return new Equipamento(dto.getId(), dto.getNome(), dto.getPatrimonio(), dto.getStatus(), dto.getTipo(), dto.getPreco());
++        return new Equipamento(dto.getId(), dto.getNome(), dto.getPatrimonio(), statusOuPadrao(dto.getStatus()),
++                dto.getTipo(), dto.getPreco(), dto.getArea(), dto.getIdSala(), dto.getDescricao());
++    }
++
++    // Sem status informado, o equipamento começa como OPERACIONAL
++    private String statusOuPadrao(String status) {
++        return (status == null || status.isBlank()) ? "OPERACIONAL" : status;
+     }
+ }
+\ No newline at end of file
+diff --git a/src/main/resources/application.yaml b/src/main/resources/application.yaml
+index 39892d2..e943563 100644
+--- a/src/main/resources/application.yaml
++++ b/src/main/resources/application.yaml
+@@ -1,4 +1,8 @@
+ spring:
++  # Lê variáveis de um arquivo .env na raiz do projeto, se existir (não vai para o Git).
++  config:
++    import: optional:file:.env[.properties]
++
+   application:
+     name: ${DB_PROJECT_NAME:helptec}
+ 
+@@ -65,6 +69,9 @@ app:
+     credentials-json: ${FIREBASE_CREDENTIALS_JSON:}
+     config-file: ${FIREBASE_CONFIG_FILE:}
+     storage-bucket: ${FIREBASE_STORAGE_BUCKET:}
++  # Endereços do front que podem chamar a API (CORS), separados por vírgula. "*" = qualquer um
++  cors:
++    allowed-origins: ${CORS_ALLOWED_ORIGINS:*}
+   google:
+       extra-client-ids: 801876311719-o76pql4jcc9uc5m58qtvp7m7dvq8g6ap.apps.googleusercontent.com
+ 
+diff --git a/src/test/java/br/edu/fiec/helptec/features/equipamento/service/EquipamentoServiceTest.java b/src/test/java/br/edu/fiec/helptec/features/equipamento/service/EquipamentoServiceTest.java
+index 85760fa..72f1dfa 100644
+--- a/src/test/java/br/edu/fiec/helptec/features/equipamento/service/EquipamentoServiceTest.java
++++ b/src/test/java/br/edu/fiec/helptec/features/equipamento/service/EquipamentoServiceTest.java
+@@ -32,7 +32,8 @@ class EquipamentoServiceTest {
+     private EquipamentoService equipamentoService;
+ 
+     private static Equipamento equipamento(Long id) {
+-        return new Equipamento(id, "Projetor Epson", "PAT-0004", "ATIVO", "PROJETOR", 2800.0);
++        return new Equipamento(id, "Projetor Epson", "PAT-0004", "OPERACIONAL", "PROJETOR", 2800.0,
++                "Informática", 1L, "Projetor do laboratório");
+     }
+ 
+     @Test
+@@ -45,7 +46,8 @@ class EquipamentoServiceTest {
+             e.setId(7L);
+             return e;
+         });
+-        EquipamentoDTO dto = new EquipamentoDTO(55L, "Notebook", "PAT-9", "ATIVO", "NOTEBOOK", 4200.0);
++        EquipamentoDTO dto = new EquipamentoDTO(55L, "Notebook", "PAT-9", "OPERACIONAL", "NOTEBOOK", 4200.0,
++                "Secretaria", 2L, "Notebook da secretaria");
+ 
+         //impl
+         EquipamentoDTO resultado = equipamentoService.criar(dto);
+@@ -61,7 +63,8 @@ class EquipamentoServiceTest {
+         //mocks
+         when(equipamentoRepository.findById(4L)).thenReturn(Optional.of(equipamento(4L)));
+         when(equipamentoRepository.save(any(Equipamento.class))).thenAnswer(inv -> inv.getArgument(0));
+-        EquipamentoDTO novo = new EquipamentoDTO(null, "Projetor BenQ", "PAT-0040", "MANUTENCAO", "PROJETOR", 3100.0);
++        EquipamentoDTO novo = new EquipamentoDTO(null, "Projetor BenQ", "PAT-0040", "MANUTENCAO", "PROJETOR", 3100.0,
++                "Biblioteca", 6L, "Lâmpada trocada");
+ 
+         //impl
+         EquipamentoDTO resultado = equipamentoService.atualizar(4L, novo);
+@@ -73,10 +76,28 @@ class EquipamentoServiceTest {
+                 () -> assertEquals("PAT-0040", resultado.getPatrimonio()),
+                 () -> assertEquals("MANUTENCAO", resultado.getStatus()),
+                 () -> assertEquals("PROJETOR", resultado.getTipo()),
+-                () -> assertEquals(Double.valueOf(3100.0), resultado.getPreco())
++                () -> assertEquals(Double.valueOf(3100.0), resultado.getPreco()),
++                () -> assertEquals("Biblioteca", resultado.getArea()),
++                () -> assertEquals(Long.valueOf(6L), resultado.getIdSala()),
++                () -> assertEquals("Lâmpada trocada", resultado.getDescricao())
+         );
+     }
+ 
++    @Test
++    @DisplayName("sem status informado, o equipamento começa OPERACIONAL")
++    void deveUsarStatusPadrao() {
++        //mocks
++        when(equipamentoRepository.save(any(Equipamento.class))).thenAnswer(inv -> inv.getArgument(0));
++        EquipamentoDTO dto = new EquipamentoDTO(null, null, "PAT-77", " ", "COMPUTADOR", null,
++                "Laboratório", 1L, null);
++
++        //impl
++        EquipamentoDTO resultado = equipamentoService.criar(dto);
++
++        //asserts
++        assertEquals("OPERACIONAL", resultado.getStatus());
++    }
++
+     @Test
+     @DisplayName("deve falhar ao buscar equipamento inexistente")
+     void naoDeveBuscarEquipamentoInexistente() {
+-- 
+2.43.0
+

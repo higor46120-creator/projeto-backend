@@ -1,0 +1,35 @@
+# =====================================================================
+# Perfil "local": MongoDB rodando na própria máquina, para testes.
+# Ativar: SPRING_PROFILES_ACTIVE=local (ou "Active profiles: local" no IntelliJ).
+#
+# Subir o MongoDB:  docker compose up -d   (ou instalar o MongoDB Community Server)
+# Na primeira execução o banco é populado com salas, equipamentos, skills e
+# um usuário de teste para cada papel (ver DadosIniciaisLocal).
+# =====================================================================
+spring:
+  mongodb:
+    uri: ${MONGODB_URI_LOCAL:mongodb://localhost:27017}
+    database: ${MONGODB_DATABASE_LOCAL:helptec_local}
+
+  # Sem as chaves do Google o sistema sobe do mesmo jeito; só o login Google pelo navegador
+  # não funciona. O login com e-mail e senha (usuários de teste) funciona normalmente.
+  security:
+    oauth2:
+      client:
+        registration:
+          google:
+            client-id: ${GOOGLE_CLIENT_ID:sem-google-no-local}
+            client-secret: ${GOOGLE_CLIENT_SECRET:sem-google-no-local}
+
+app:
+  seed:
+    enabled: true
+    # Senha dos usuários de teste (só existe no banco local)
+    senha: ${SEED_SENHA:helptec123}
+    # Seu e-mail do Google: vira ADMIN no banco local para o login Google do app funcionar
+    google-admin-email: ${SEED_GOOGLE_ADMIN_EMAIL:}
+
+logging:
+  level:
+    # Mostra no console as consultas feitas ao MongoDB (ajuda a depurar)
+    org.springframework.data.mongodb.core.MongoTemplate: DEBUG

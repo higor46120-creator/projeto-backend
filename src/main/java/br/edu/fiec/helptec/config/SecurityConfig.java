@@ -1,5 +1,6 @@
 package br.edu.fiec.helptec.config;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpStatus;
@@ -16,6 +17,8 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 
 @Configuration
@@ -25,10 +28,18 @@ public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthFilter;
     private final AuthenticationProvider authenticationProvider;
+    private final OAuth2SuccessHandler oAuth2SuccessHandler;
 
-    public SecurityConfig(JwtAuthenticationFilter jwtAuthFilter, AuthenticationProvider authenticationProvider) {
+    // Mesma URL usada pelo OAuth2SuccessHandler (front: /oauth2/redirect)
+    @Value("${app.oauth2.redirect-uri:http://localhost:3000/oauth2/redirect}")
+    private String frontendRedirectUri;
+
+    public SecurityConfig(JwtAuthenticationFilter jwtAuthFilter,
+                          AuthenticationProvider authenticationProvider,
+                          OAuth2SuccessHandler oAuth2SuccessHandler) {
         this.jwtAuthFilter = jwtAuthFilter;
         this.authenticationProvider = authenticationProvider;
+        this.oAuth2SuccessHandler = oAuth2SuccessHandler;
     }
 
     private static final String[] PUBLIC_MATCHERS = {
@@ -40,8 +51,6 @@ public class SecurityConfig {
 
             "/oauth2/**",
             "/login/oauth2/**",
-
-            "/api/chamados/**", // ← Rota pública: POST e GET liberados sem exigência de JWT ou OAuth2
 
             "/images/**",
 
@@ -80,16 +89,40 @@ public class SecurityConfig {
 
                 .authenticationProvider(authenticationProvider)
 
+                // Login com Google pelo NAVEGADOR (front web): /oauth2/authorization/google
+                // -> Google -> /login/oauth2/code/google -> OAuth2SuccessHandler gera o JWT
+                // e redireciona para app.oauth2.redirect-uri?token=...
+                // O mobile continua usando POST /api/v1/auth/google com o ID token.
+                // Como o authenticationEntryPoint acima é explícito, a API continua respondendo
+                // 401 em JSON (e não redireciona para a página do Google).
+                .oauth2Login(oauth2 -> oauth2
+                        .successHandler(oAuth2SuccessHandler)
+                        // Em caso de falha, devolve para o front com ?error=... (em vez de /login?error,
+                        // que não existe no backend e virava uma página 404)
+                        .failureHandler((request, response, exception) -> response.sendRedirect(
+                                frontendRedirectUri + "?error=" + URLEncoder.encode(
+                                        String.valueOf(exception.getMessage()), StandardCharsets.UTF_8)
+                        ))
+                )
+
                 // Insere o filtro JWT antes do filtro padrão do Spring
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }
 
+    // Endereços do front que podem chamar a API, separados por vírgula
+    // (CORS_ALLOWED_ORIGINS). "*" libera qualquer endereço.
+    @Value("${app.cors.allowed-origins:*}")
+    private String allowedOrigins;
+
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(List.of("*"));
+        configuration.setAllowedOriginPatterns(java.util.Arrays.stream(allowedOrigins.split(","))
+                .map(String::trim)
+                .filter(origem -> !origem.isEmpty())
+                .toList());
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
         configuration.setAllowedHeaders(List.of("*"));
         configuration.setAllowCredentials(false);
