@@ -146,6 +146,23 @@ public class ChamadoService {
     }
 
     // ---------------------------------------------------------
+    // 3b. Suporte assume um chamado aprovado ("Iniciar Atendimento"):
+    //     o próprio usuário logado vira o suporte do chamado
+    // ---------------------------------------------------------
+    public ChamadoDTO iniciarAtendimento(Long idChamado, UsuarioEntity suporte) {
+        Chamado chamado = buscarOuFalhar(idChamado);
+        validarStatus(chamado, StatusChamado.APROVADO);
+
+        if (suporte.getRole() != UserRole.SUPORTE && suporte.getRole() != UserRole.ADMIN) {
+            throw new IllegalStateException("Só usuários de suporte podem iniciar o atendimento");
+        }
+
+        chamado.setIdSuporte(suporte.getId());
+        chamado.setStatus(StatusChamado.EM_ATENDIMENTO);
+        return toDTO(chamadoRepository.save(chamado));
+    }
+
+    // ---------------------------------------------------------
     // 4. Suporte resolve o chamado
     // ---------------------------------------------------------
     public ChamadoDTO resolver(Long idChamado, String resolucao) {

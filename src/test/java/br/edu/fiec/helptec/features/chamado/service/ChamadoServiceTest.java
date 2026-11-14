@@ -303,6 +303,55 @@ class ChamadoServiceTest {
     }
 
     @Nested
+    @DisplayName("Iniciar atendimento (suporte assume)")
+    class IniciarAtendimento {
+
+        @Test
+        @DisplayName("o suporte logado assume o chamado aprovado")
+        void deveIniciarAtendimento() {
+            //mocks
+            UsuarioEntity suporte = Fabrica.usuario(UserRole.SUPORTE);
+            when(chamadoRepository.findById(ID_CHAMADO))
+                    .thenReturn(Optional.of(Fabrica.chamado(ID_CHAMADO, ID_SOLICITANTE, StatusChamado.APROVADO)));
+            saveDevolveOMesmoObjeto();
+
+            //impl
+            ChamadoDTO resultado = chamadoService.iniciarAtendimento(ID_CHAMADO, suporte);
+
+            //asserts
+            assertEquals(StatusChamado.EM_ATENDIMENTO, resultado.getStatus());
+            assertEquals(suporte.getId(), resultado.getIdSuporte());
+            assertEquals(ID_SOLICITANTE, resultado.getIdUsuario(), "o solicitante não muda");
+        }
+
+        @Test
+        @DisplayName("quem não é do suporte não pode iniciar")
+        void naoDeveIniciarSemPapelSuporte() {
+            //mocks
+            when(chamadoRepository.findById(ID_CHAMADO))
+                    .thenReturn(Optional.of(Fabrica.chamado(ID_CHAMADO, ID_SOLICITANTE, StatusChamado.APROVADO)));
+
+            //impl + asserts
+            assertThrows(IllegalStateException.class,
+                    () -> chamadoService.iniciarAtendimento(ID_CHAMADO, Fabrica.usuario(UserRole.GERENTE)));
+            verify(chamadoRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("não inicia chamado que ainda não foi aprovado")
+        void naoDeveIniciarChamadoNaoAprovado() {
+            //mocks
+            when(chamadoRepository.findById(ID_CHAMADO))
+                    .thenReturn(Optional.of(Fabrica.chamado(ID_CHAMADO, ID_SOLICITANTE, StatusChamado.AGUARDANDO_APROVACAO)));
+
+            //impl + asserts
+            assertThrows(IllegalStateException.class,
+                    () -> chamadoService.iniciarAtendimento(ID_CHAMADO, Fabrica.usuario(UserRole.SUPORTE)));
+            verify(chamadoRepository, never()).save(any());
+        }
+    }
+
+    @Nested
     @DisplayName("Resolução")
     class Resolucao {
 

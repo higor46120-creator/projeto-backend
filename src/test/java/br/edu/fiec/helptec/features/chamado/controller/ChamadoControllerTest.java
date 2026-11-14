@@ -131,6 +131,29 @@ class ChamadoControllerTest {
     }
 
     @Test
+    @DisplayName("PATCH /iniciar usa o suporte logado")
+    void deveIniciarAtendimentoComUsuarioLogado() throws Exception {
+        //mocks
+        UsuarioEntity suporte = Fabrica.usuario(UserRole.SUPORTE);
+        UserContext.setUser(suporte);
+        when(chamadoService.iniciarAtendimento(1L, suporte)).thenReturn(dto(1L, StatusChamado.EM_ATENDIMENTO));
+
+        //impl + asserts
+        mockMvc.perform(patch("/api/chamados/1/iniciar"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("EM_ATENDIMENTO"));
+    }
+
+    @Test
+    @DisplayName("PATCH /iniciar sem usuário logado devolve 401")
+    void naoDeveIniciarSemUsuarioLogado() throws Exception {
+        //impl + asserts
+        mockMvc.perform(patch("/api/chamados/1/iniciar"))
+                .andExpect(status().isUnauthorized());
+        verify(chamadoService, never()).iniciarAtendimento(any(), any());
+    }
+
+    @Test
     @DisplayName("PATCH /triagem repassa o suporte escolhido")
     void deveTriar() throws Exception {
         //mocks
