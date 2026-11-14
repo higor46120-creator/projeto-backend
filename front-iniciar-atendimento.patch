@@ -1,0 +1,106 @@
+From 38ae732a3114ffa8bd77af3a569b89e2d348b3fa Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sat, 14 Nov 2026 11:08:22 -0300
+Subject: [PATCH] Iniciar Atendimento usa o suporte logado e a rota /iniciar
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+O SupportPage usava um id fixo (1) e a rota de triagem, que é só do
+gerente/admin. Agora usa o id de quem está logado (/usuarios/me) e chama
+PATCH /api/chamados/{id}/iniciar.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_012xpyFRPS2vqxyuCv6P8vvC
+---
+ src/pages/suporte/SupportPage.jsx     | 18 ++++++++++--------
+ src/shared/services/chamadoService.js |  5 +++++
+ 2 files changed, 15 insertions(+), 8 deletions(-)
+
+diff --git a/src/pages/suporte/SupportPage.jsx b/src/pages/suporte/SupportPage.jsx
+index 48edafa..677b683 100644
+--- a/src/pages/suporte/SupportPage.jsx
++++ b/src/pages/suporte/SupportPage.jsx
+@@ -1,4 +1,4 @@
+-import { useState, useEffect, useCallback } from 'react';
++import { useState, useEffect, useCallback, useContext } from 'react';
+ import {
+   Play,
+   CheckCircle,
+@@ -10,6 +10,7 @@ import {
+ } from 'lucide-react';
+ import { TopBar } from '../../components/TopBar';
+ import { useTema } from '../../utils/useTema';
++import { AuthContext } from '../../contexts/AuthContext';
+ import { ChatBox } from './components/ChatBox';
+ import { EquipmentManagement } from './components/EquipmentManagement';
+ import { chamadoService } from '../../shared/services/chamadoService';
+@@ -22,10 +23,6 @@ import {
+   getPriorityColor,
+ } from '../../utils/formatters';
+ 
+-// TODO: ligar ao login real (hoje o AuthContext só guarda o token).
+-// É o id do técnico de suporte usado em "Iniciar Atendimento" e para saber quais chamados são "meus".
+-const ID_SUPORTE_ATUAL = 1;
+-
+ const COR_TOPBAR = {
+   glow: 'bg-purple-500',
+   bg: 'from-purple-100 to-fuchsia-50 dark:from-purple-900/60 dark:to-purple-900/30',
+@@ -35,6 +32,11 @@ const COR_TOPBAR = {
+ export default function SupportPage() {
+   const [tema, alternarTema] = useTema();
+ 
++  // Id de quem está logado (GET /usuarios/me): usado para saber quais chamados são "meus"
++  const { usuario } = useContext(AuthContext);
++  const meuId = usuario?.idUsuario ? String(usuario.idUsuario) : null;
++  const ehMeu = (ticket) => meuId !== null && String(ticket.id_suporte ?? '') === meuId;
++
+   const [tickets, setTickets] = useState([]);
+   const [loading, setLoading] = useState(false);
+   const [error, setError] = useState(null);
+@@ -66,7 +68,7 @@ export default function SupportPage() {
+ 
+   // Fila: aprovados que ainda não têm técnico
+   const queueTickets = tickets.filter((t) => t.status_api === 'APROVADO' && !t.id_suporte);
+-  const myTickets = tickets.filter((t) => t.id_suporte === ID_SUPORTE_ATUAL);
++  const myTickets = tickets.filter(ehMeu);
+   const inProgressTickets = myTickets.filter((t) => t.status_api === 'EM_ATENDIMENTO');
+   const resolvedTickets = myTickets.filter((t) => t.status_api === 'RESOLVIDO');
+ 
+@@ -91,7 +93,7 @@ export default function SupportPage() {
+ 
+   const handleStartSupport = (idChamado) =>
+     executarAcao(
+-      () => chamadoService.triar(idChamado, ID_SUPORTE_ATUAL),
++      () => chamadoService.iniciarAtendimento(idChamado),
+       idChamado,
+       'Não foi possível iniciar o atendimento.',
+     );
+@@ -236,7 +238,7 @@ export default function SupportPage() {
+                 </div>
+               ) : (
+                 displayTickets.map((ticket) => {
+-                  const isMyTicket = ticket.id_suporte === ID_SUPORTE_ATUAL;
++                  const isMyTicket = ehMeu(ticket);
+                   const naFila = ticket.status_api === 'APROVADO' && !ticket.id_suporte;
+                   const emAtendimento = isMyTicket && ticket.status_api === 'EM_ATENDIMENTO';
+                   const aberto = expandedTicket === ticket.id_chamado;
+diff --git a/src/shared/services/chamadoService.js b/src/shared/services/chamadoService.js
+index 0c9b5e9..fff105a 100644
+--- a/src/shared/services/chamadoService.js
++++ b/src/shared/services/chamadoService.js
+@@ -127,6 +127,11 @@ export const chamadoService = {
+     return await api.delete(`/api/chamados/${idChamado}`);
+   },
+ 
++  // Suporte logado assume o chamado aprovado (o back usa quem está logado)
++  async iniciarAtendimento(idChamado) {
++    return await api.patch(`/api/chamados/${idChamado}/iniciar`);
++  },
++
+   async triar(idChamado, idSuporte) {
+     return await api.patch(`/api/chamados/${idChamado}/triagem`, { idSuporte });
+   },
+-- 
+2.43.0
+

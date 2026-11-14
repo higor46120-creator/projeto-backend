@@ -1,0 +1,168 @@
+From d092f8a138bf1682ae0525e1fee1a69cc10ebcf0 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sat, 14 Nov 2026 10:29:00 -0300
+Subject: [PATCH] Chamado aceita sala e equipamento digitados (sem cadastro)
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+- Novos campos salaInformada e equipamentoInformado no chamado e no DTO
+- O cadastro (idSala/idEquipamento) tem prioridade: com id, o texto é descartado
+- Importação CSV aceita as colunas salaInformada e equipamentoInformado
+- Testes do novo comportamento
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_012xpyFRPS2vqxyuCv6P8vvC
+---
+ .../helptec/features/chamado/Chamado.java     |  5 +++
+ .../chamado/model/dto/ChamadoCsvDTO.java      |  6 +++
+ .../chamado/model/dto/ChamadoDTO.java         |  2 +
+ .../chamado/service/ChamadoService.java       | 16 ++++++-
+ .../chamado/service/ChamadoServiceTest.java   | 45 +++++++++++++++++++
+ 5 files changed, 73 insertions(+), 1 deletion(-)
+
+diff --git a/src/main/java/br/edu/fiec/helptec/features/chamado/Chamado.java b/src/main/java/br/edu/fiec/helptec/features/chamado/Chamado.java
+index d3ffa36..db196a0 100644
+--- a/src/main/java/br/edu/fiec/helptec/features/chamado/Chamado.java
++++ b/src/main/java/br/edu/fiec/helptec/features/chamado/Chamado.java
+@@ -39,4 +39,9 @@ public class Chamado {
+ 
+     private Long idEquipamento;
+     private Long idSala;
++
++    // Texto digitado pelo usuário quando a sala/equipamento não está cadastrado.
++    // Nesse caso idSala/idEquipamento ficam nulos (o cadastro tem prioridade).
++    private String salaInformada;
++    private String equipamentoInformado;
+ }
+\ No newline at end of file
+diff --git a/src/main/java/br/edu/fiec/helptec/features/chamado/model/dto/ChamadoCsvDTO.java b/src/main/java/br/edu/fiec/helptec/features/chamado/model/dto/ChamadoCsvDTO.java
+index 24abe72..2d75f1a 100644
+--- a/src/main/java/br/edu/fiec/helptec/features/chamado/model/dto/ChamadoCsvDTO.java
++++ b/src/main/java/br/edu/fiec/helptec/features/chamado/model/dto/ChamadoCsvDTO.java
+@@ -23,4 +23,10 @@ public class ChamadoCsvDTO {
+ 
+     @CsvBindByName(column = "idSala")
+     private Long idSala;
++
++    @CsvBindByName(column = "salaInformada")
++    private String salaInformada;
++
++    @CsvBindByName(column = "equipamentoInformado")
++    private String equipamentoInformado;
+ }
+\ No newline at end of file
+diff --git a/src/main/java/br/edu/fiec/helptec/features/chamado/model/dto/ChamadoDTO.java b/src/main/java/br/edu/fiec/helptec/features/chamado/model/dto/ChamadoDTO.java
+index e349511..f29024b 100644
+--- a/src/main/java/br/edu/fiec/helptec/features/chamado/model/dto/ChamadoDTO.java
++++ b/src/main/java/br/edu/fiec/helptec/features/chamado/model/dto/ChamadoDTO.java
+@@ -25,4 +25,6 @@ public class ChamadoDTO {
+     private String resolucao;
+     private Long idEquipamento;
+     private Long idSala;
++    private String salaInformada;        // sala digitada (sem cadastro)
++    private String equipamentoInformado; // patrimônio/máquina digitado (sem cadastro)
+ }
+diff --git a/src/main/java/br/edu/fiec/helptec/features/chamado/service/ChamadoService.java b/src/main/java/br/edu/fiec/helptec/features/chamado/service/ChamadoService.java
+index bf6a18b..ff6d3b7 100644
+--- a/src/main/java/br/edu/fiec/helptec/features/chamado/service/ChamadoService.java
++++ b/src/main/java/br/edu/fiec/helptec/features/chamado/service/ChamadoService.java
+@@ -68,6 +68,11 @@ public class ChamadoService {
+         chamado.setDataFinal(null);
+         chamado.setResolucao(null);
+ 
++        // Sala e equipamento: o cadastro (id) tem prioridade; sem id, guarda o texto digitado
++        chamado.setSalaInformada(chamado.getIdSala() != null ? null : textoOuNulo(dto.getSalaInformada()));
++        chamado.setEquipamentoInformado(
++                chamado.getIdEquipamento() != null ? null : textoOuNulo(dto.getEquipamentoInformado()));
++
+         return toDTO(chamadoRepository.save(chamado));
+     }
+ 
+@@ -92,6 +97,8 @@ public class ChamadoService {
+                 dto.setCriticidade(linha.getCriticidade());
+                 dto.setIdEquipamento(linha.getIdEquipamento());
+                 dto.setIdSala(linha.getIdSala());
++                dto.setSalaInformada(linha.getSalaInformada());
++                dto.setEquipamentoInformado(linha.getEquipamentoInformado());
+ 
+                 criados.add(criar(dto));
+             }
+@@ -178,10 +185,17 @@ public class ChamadoService {
+         return new ChamadoDTO(
+                 c.getIdChamado(), c.getIdUsuario(), c.getArea(), c.getIdSuporte(),
+                 c.getDescricao(), c.getStatus(), c.getPrioridade(), c.getCriticidade(),
+-                c.getDataAbertura(), c.getDataFinal(), c.getResolucao(), c.getIdEquipamento(), c.getIdSala()
++                c.getDataAbertura(), c.getDataFinal(), c.getResolucao(), c.getIdEquipamento(), c.getIdSala(),
++                c.getSalaInformada(), c.getEquipamentoInformado()
+         );
+     }
+ 
++    /** Texto sem espaços nas pontas; vazio vira null. */
++    private static String textoOuNulo(String texto) {
++        if (texto == null || texto.isBlank()) return null;
++        return texto.trim();
++    }
++
+     private Chamado toEntity(ChamadoDTO dto) {
+         return Chamado.builder()
+                 .idChamado(dto.getIdChamado())
+diff --git a/src/test/java/br/edu/fiec/helptec/features/chamado/service/ChamadoServiceTest.java b/src/test/java/br/edu/fiec/helptec/features/chamado/service/ChamadoServiceTest.java
+index a286247..5c11d5b 100644
+--- a/src/test/java/br/edu/fiec/helptec/features/chamado/service/ChamadoServiceTest.java
++++ b/src/test/java/br/edu/fiec/helptec/features/chamado/service/ChamadoServiceTest.java
+@@ -109,6 +109,51 @@ class ChamadoServiceTest {
+             assertEquals(ID_SOLICITANTE, resultado.getIdUsuario());
+         }
+ 
++        @Test
++        @DisplayName("aceita sala e equipamento digitados quando não estão cadastrados")
++        void deveAceitarSalaEEquipamentoDigitados() {
++            //mocks
++            when(usuarioRepository.findById(ID_SOLICITANTE))
++                    .thenReturn(Optional.of(Fabrica.usuario(ID_SOLICITANTE, UserRole.USER)));
++            saveDevolveOMesmoObjeto();
++            ChamadoDTO dto = new ChamadoDTO();
++            dto.setIdUsuario(ID_SOLICITANTE);
++            dto.setDescricao("Projetor sem imagem");
++            dto.setSalaInformada("  Laboratório 7  ");
++            dto.setEquipamentoInformado("PC do professor");
++
++            //impl
++            ChamadoDTO resultado = chamadoService.criar(dto);
++
++            //asserts
++            assertNull(resultado.getIdSala());
++            assertNull(resultado.getIdEquipamento());
++            assertEquals("Laboratório 7", resultado.getSalaInformada(), "o texto é guardado sem espaços nas pontas");
++            assertEquals("PC do professor", resultado.getEquipamentoInformado());
++        }
++
++        @Test
++        @DisplayName("quando a sala existe no cadastro, o texto digitado é descartado")
++        void devePriorizarCadastroSobreTextoDigitado() {
++            //mocks
++            when(usuarioRepository.findById(ID_SOLICITANTE))
++                    .thenReturn(Optional.of(Fabrica.usuario(ID_SOLICITANTE, UserRole.USER)));
++            saveDevolveOMesmoObjeto();
++            ChamadoDTO dto = new ChamadoDTO();
++            dto.setIdUsuario(ID_SOLICITANTE);
++            dto.setIdSala(3L);
++            dto.setSalaInformada("Sala 101");
++            dto.setEquipamentoInformado("   ");
++
++            //impl
++            ChamadoDTO resultado = chamadoService.criar(dto);
++
++            //asserts
++            assertEquals(Long.valueOf(3L), resultado.getIdSala());
++            assertNull(resultado.getSalaInformada());
++            assertNull(resultado.getEquipamentoInformado(), "texto em branco vira null");
++        }
++
+         @Test
+         @DisplayName("não deve abrir chamado de solicitante inexistente")
+         void naoDeveCriarChamadoSemSolicitante() {
+-- 
+2.43.0
+
