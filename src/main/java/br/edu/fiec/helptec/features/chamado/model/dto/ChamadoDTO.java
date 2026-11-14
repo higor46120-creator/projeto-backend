@@ -25,4 +25,6 @@ public class ChamadoDTO {
     private String resolucao;
     private Long idEquipamento;
     private Long idSala;
+    private String salaInformada;        // sala digitada (sem cadastro)
+    private String equipamentoInformado; // patrimônio/máquina digitado (sem cadastro)
 }

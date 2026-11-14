@@ -23,4 +23,10 @@ public class ChamadoCsvDTO {
 
     @CsvBindByName(column = "idSala")
     private Long idSala;
+
+    @CsvBindByName(column = "salaInformada")
+    private String salaInformada;
+
+    @CsvBindByName(column = "equipamentoInformado")
+    private String equipamentoInformado;
 }

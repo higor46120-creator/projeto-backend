@@ -110,6 +110,51 @@ class ChamadoServiceTest {
         }
 
         @Test
+        @DisplayName("aceita sala e equipamento digitados quando não estão cadastrados")
+        void deveAceitarSalaEEquipamentoDigitados() {
+            //mocks
+            when(usuarioRepository.findById(ID_SOLICITANTE))
+                    .thenReturn(Optional.of(Fabrica.usuario(ID_SOLICITANTE, UserRole.USER)));
+            saveDevolveOMesmoObjeto();
+            ChamadoDTO dto = new ChamadoDTO();
+            dto.setIdUsuario(ID_SOLICITANTE);
+            dto.setDescricao("Projetor sem imagem");
+            dto.setSalaInformada("  Laboratório 7  ");
+            dto.setEquipamentoInformado("PC do professor");
+
+            //impl
+            ChamadoDTO resultado = chamadoService.criar(dto);
+
+            //asserts
+            assertNull(resultado.getIdSala());
+            assertNull(resultado.getIdEquipamento());
+            assertEquals("Laboratório 7", resultado.getSalaInformada(), "o texto é guardado sem espaços nas pontas");
+            assertEquals("PC do professor", resultado.getEquipamentoInformado());
+        }
+
+        @Test
+        @DisplayName("quando a sala existe no cadastro, o texto digitado é descartado")
+        void devePriorizarCadastroSobreTextoDigitado() {
+            //mocks
+            when(usuarioRepository.findById(ID_SOLICITANTE))
+                    .thenReturn(Optional.of(Fabrica.usuario(ID_SOLICITANTE, UserRole.USER)));
+            saveDevolveOMesmoObjeto();
+            ChamadoDTO dto = new ChamadoDTO();
+            dto.setIdUsuario(ID_SOLICITANTE);
+            dto.setIdSala(3L);
+            dto.setSalaInformada("Sala 101");
+            dto.setEquipamentoInformado("   ");
+
+            //impl
+            ChamadoDTO resultado = chamadoService.criar(dto);
+
+            //asserts
+            assertEquals(Long.valueOf(3L), resultado.getIdSala());
+            assertNull(resultado.getSalaInformada());
+            assertNull(resultado.getEquipamentoInformado(), "texto em branco vira null");
+        }
+
+        @Test
         @DisplayName("não deve abrir chamado de solicitante inexistente")
         void naoDeveCriarChamadoSemSolicitante() {
             //mocks
