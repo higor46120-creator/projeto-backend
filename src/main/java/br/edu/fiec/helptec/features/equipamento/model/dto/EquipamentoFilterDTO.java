@@ -16,4 +16,6 @@ public class EquipamentoFilterDTO {
     private String tipo;
     private Double precoMin;
     private Double precoMax;
+    private String area;
+    private Long idSala;
 }

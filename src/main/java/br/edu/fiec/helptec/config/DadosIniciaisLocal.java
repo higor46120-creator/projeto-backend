@@ -146,7 +146,7 @@ public class DadosIniciaisLocal implements ApplicationRunner {
         return Equipamento.builder()
                 .nome(nome)
                 .patrimonio(patrimonio)
-                .status("ATIVO")
+                .status("OPERACIONAL")
                 .tipo(tipo)
                 .preco(preco)
                 .build();

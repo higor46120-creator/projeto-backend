@@ -14,5 +14,7 @@ public class EquipamentoDTO {
     private String status;
     private String tipo;
     private Double preco;
-
+    private String area;
+    private Long idSala;
+    private String descricao;
 }
