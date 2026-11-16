@@ -51,3 +51,8 @@ application-secrets.properties
 
 .mvn
 .mvn/**
+
+# Arquivos de patch/bundle usados para aplicar alterações (não fazem parte do projeto)
+*.patch
+*.bundle
+alinhamento/

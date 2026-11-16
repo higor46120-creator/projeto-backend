@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
@@ -69,15 +70,20 @@ public class ChamadoAnexoService {
         Path caminhoImagemPrincipal = pastaUploads.resolve(nomeBase);
         Path caminhoThumbnail = pastaUploads.resolve("thumb_" + nomeBase);
 
-        Thumbnails.of(file.getInputStream())
-                .size(600, 600)
-                .outputFormat("jpg")
-                .toFile(caminhoImagemPrincipal.toFile());
+        // try-with-resources: o arquivo enviado é fechado mesmo se der erro
+        try (InputStream imagem = file.getInputStream()) {
+            Thumbnails.of(imagem)
+                    .size(600, 600)
+                    .outputFormat("jpg")
+                    .toFile(caminhoImagemPrincipal.toFile());
+        }
 
-        Thumbnails.of(file.getInputStream())
-                .size(150, 150)
-                .outputFormat("jpg")
-                .toFile(caminhoThumbnail.toFile());
+        try (InputStream imagem = file.getInputStream()) {
+            Thumbnails.of(imagem)
+                    .size(150, 150)
+                    .outputFormat("jpg")
+                    .toFile(caminhoThumbnail.toFile());
+        }
 
         ChamadoAnexo anexo = new ChamadoAnexo(null, idChamado, nomeBase, "IMAGEM", file.getOriginalFilename());
         ChamadoAnexo salvo = chamadoAnexoRepository.save(anexo);
