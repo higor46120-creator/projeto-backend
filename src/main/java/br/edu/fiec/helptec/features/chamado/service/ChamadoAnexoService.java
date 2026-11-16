@@ -1,11 +1,13 @@
 package br.edu.fiec.helptec.features.chamado.service;
 
 import br.edu.fiec.helptec.config.FirebaseStorageService;
+import br.edu.fiec.helptec.config.aws.S3StorageService;
 import br.edu.fiec.helptec.features.chamado.ChamadoAnexo;
 import br.edu.fiec.helptec.features.chamado.model.dto.ChamadoAnexoDTO;
 import br.edu.fiec.helptec.features.chamado.repository.ChamadoAnexoRepository;
 import net.coobird.thumbnailator.Thumbnails;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -25,12 +27,19 @@ public class ChamadoAnexoService {
     @Autowired
     private FirebaseStorageService firebaseStorageService;
 
+    @Autowired
+    private S3StorageService s3StorageService;
+
+    // true: anexos vão para o bucket S3 da AWS; false: Firebase Storage
+    @Value("${cloud.aws.s3.enabled:true}")
+    private boolean usarS3;
+
     private static final String PASTA_UPLOADS = "uploads";
     private static final List<String> TIPOS_IMAGEM = List.of("image/jpeg", "image/png", "image/webp");
     private static final List<String> TIPOS_VIDEO = List.of("video/mp4", "video/quicktime", "video/webm");
 
     // ---------------------------------------------------------
-    // 1. Upload original — vai para o Firebase Storage (imagem OU vídeo)
+    // 1. Upload original — vai para o S3 da AWS (ou Firebase Storage) — imagem OU vídeo
     // ---------------------------------------------------------
     public ChamadoAnexoDTO upload(Long idChamado, MultipartFile file) throws IOException {
         String contentType = file.getContentType();
@@ -44,7 +53,10 @@ public class ChamadoAnexoService {
             throw new IllegalArgumentException("Tipo de arquivo não suportado: " + contentType);
         }
 
-        String url = firebaseStorageService.upload(file, "chamados/" + idChamado);
+        String pasta = "chamados/" + idChamado;
+        String url = usarS3
+                ? s3StorageService.upload(file, pasta)
+                : firebaseStorageService.upload(file, pasta);
 
         ChamadoAnexo anexo = new ChamadoAnexo(null, idChamado, url, tipo, file.getOriginalFilename());
         ChamadoAnexo salvo = chamadoAnexoRepository.save(anexo);
@@ -100,17 +112,23 @@ public class ChamadoAnexoService {
     }
 
     // ---------------------------------------------------------
-    // 4. Deletar anexo (remove do Firebase Storage e do banco)
+    // 4. Deletar anexo (remove do S3/Firebase Storage e do banco)
     // ---------------------------------------------------------
     public void deletar(Long idAnexo) {
         ChamadoAnexo anexo = chamadoAnexoRepository.findById(idAnexo)
                 .orElseThrow(() -> new RuntimeException("Anexo não encontrado"));
 
-        firebaseStorageService.deletar(anexo.getUrl());
+        if (S3StorageService.ehDoS3(anexo.getUrl())) {
+            s3StorageService.deletar(anexo.getUrl());
+        } else if (anexo.getUrl() != null && anexo.getUrl().startsWith("http")) {
+            firebaseStorageService.deletar(anexo.getUrl());
+        }
         chamadoAnexoRepository.deleteById(idAnexo);
     }
 
     private ChamadoAnexoDTO toDTO(ChamadoAnexo a) {
-        return new ChamadoAnexoDTO(a.getIdAnexo(), a.getIdChamado(), a.getUrl(), a.getTipo(), a.getNomeOriginal());
+        // Arquivo do S3 (privado): devolve um link temporário de 1 hora para abrir
+        String url = s3StorageService.linkParaLeitura(a.getUrl());
+        return new ChamadoAnexoDTO(a.getIdAnexo(), a.getIdChamado(), url, a.getTipo(), a.getNomeOriginal());
     }
 }

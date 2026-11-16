@@ -65,3 +65,18 @@ api:
     token:
       # Chave do JWT em Base64. Gerar com: openssl rand -base64 64
       secret: ${JWT_SECRET:}
+
+# ===== AWS =====
+# Os valores vêm de variáveis de ambiente (IntelliJ, ~/.aws, Kubernetes). NUNCA escreva as chaves aqui.
+cloud:
+  aws:
+    region:
+      static: ${AWS_REGION:us-east-1}
+    credentials:
+      access-key: ${AWS_ACCESS_KEY_ID:}
+      secret-key: ${AWS_SECRET_ACCESS_KEY:}
+      session-token: ${AWS_SESSION_TOKEN:}   # só nas chaves temporárias da AWS Academy
+    s3:
+      bucket: ${AWS_S3_BUCKET:fiec-tcc-helptec}
+      # true: anexos dos chamados vão para o S3; false: continuam no Firebase Storage
+      enabled: ${AWS_S3_ENABLED:true}

@@ -142,6 +142,13 @@
 			<artifactId>s3</artifactId>
 			<version>2.35.11</version>
 		</dependency>
+
+		<!-- Cliente HTTP usado pelo S3 (escolhido no AwsS3Config) -->
+		<dependency>
+			<groupId>software.amazon.awssdk</groupId>
+			<artifactId>apache-client</artifactId>
+			<version>2.35.11</version>
+		</dependency>
 	</dependencies>
 	<build>
 		<plugins>
