@@ -50,8 +50,8 @@ jobs:
 
       - name: Tag e Push da Imagem
         run: |
-          docker tag manupred_be ${{ secrets.DOCKER_USERNAME }}/manupred_be:latest
-          docker push ${{ secrets.DOCKER_USERNAME }}/manupred_be:latest
+          docker tag helptec_be ${{ secrets.DOCKER_USERNAME }}/helptec_be:latest
+          docker push ${{ secrets.DOCKER_USERNAME }}/helptec_be:latest
   deploy-kubernetes:
     runs-on: self-hosted
     needs: docker-build
