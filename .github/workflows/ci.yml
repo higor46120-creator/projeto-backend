@@ -72,7 +72,7 @@ jobs:
       - name: Baixar Artefato JAR
         uses: actions/download-artifact@v4
         with:
-          name: app-jar
+          name: helptech-backend-jar
           path: target/
 
       - name: Login no Docker Hub
