@@ -83,12 +83,12 @@ jobs:
           password: ${{ secrets.DOCKER_PASSWORD }}
 
       - name: Build da Imagem Docker
-        run: docker build -t kipper_be .
+        run: docker build -t helptech-backend .
 
       - name: Tag e Push da Imagem
         run: |
-          docker tag kipper_be ${{ secrets.DOCKER_USERNAME }}/kipper_be:latest
-          docker push ${{ secrets.DOCKER_USERNAME }}/kipper_be:latest
+          docker tag helptech-backend ${{ secrets.DOCKER_USERNAME }}/helptech-backend:latest
+          docker push ${{ secrets.DOCKER_USERNAME }}/helptech-backend:latest
 
   # ============================================
   # 3. DEPLOY MANUAL NA AWS EKS
