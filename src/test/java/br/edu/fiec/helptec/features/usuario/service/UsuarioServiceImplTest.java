@@ -36,6 +36,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -101,7 +102,7 @@ class UsuarioServiceImplTest {
     void deveListarPaginado() {
         //mocks
         List<UsuarioEntity> usuarios = List.of(Fabrica.usuario(UserRole.USER), Fabrica.usuario(UserRole.SUPORTE));
-        when(usuarioRepository.findAll(any(Pageable.class)))
+        when(usuarioRepository.findByStatusIsNullOrStatusNot(eq(UserStatus.DELETED), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(usuarios, PageRequest.of(0, 2), 3));
 
         //impl
@@ -149,11 +150,44 @@ class UsuarioServiceImplTest {
     void naoDeveDeletarUsuarioInexistente() {
         //mocks
         UUID id = UUID.randomUUID();
-        when(usuarioRepository.existsById(id)).thenReturn(false);
+        when(usuarioRepository.findById(id)).thenReturn(Optional.empty());
 
         //impl + asserts
         assertThrows(RuntimeException.class, () -> usuarioService.deletar(id));
+        verify(usuarioRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("excluir marca o usuário como DELETED, sem apagar o registro")
+    void deveExcluirLogicamente() {
+        //mocks
+        UsuarioEntity usuario = Fabrica.usuario(UserRole.SUPORTE);
+        usuario.setFcmToken("token-push");
+        when(usuarioRepository.findById(usuario.getId())).thenReturn(Optional.of(usuario));
+
+        //impl
+        usuarioService.deletar(usuario.getId());
+
+        //asserts
+        assertEquals(UserStatus.DELETED, usuario.getStatus());
+        assertEquals(null, usuario.getFcmToken());
+        verify(usuarioRepository).save(usuario);
         verify(usuarioRepository, never()).deleteById(any());
+    }
+
+    @Test
+    @DisplayName("a listagem completa ignora usuários DELETED")
+    void listarTodosIgnoraDeletados() {
+        //mocks
+        when(usuarioRepository.findByStatusIsNullOrStatusNot(UserStatus.DELETED))
+                .thenReturn(List.of(Fabrica.usuario(UserRole.USER)));
+
+        //impl
+        List<UsuarioResponseDTO> resultado = usuarioService.listarTodos();
+
+        //asserts
+        assertEquals(1, resultado.size());
+        verify(usuarioRepository, never()).findAll();
     }
 
     @Test

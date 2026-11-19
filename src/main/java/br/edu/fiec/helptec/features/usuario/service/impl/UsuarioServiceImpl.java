@@ -65,7 +65,8 @@ public class UsuarioServiceImpl implements UsuarioService {
 
     @Override
     public List<UsuarioResponseDTO> listarTodos() {
-        return usuarioRepository.findAll().stream()
+        // Contas DELETED não aparecem nas listagens
+        return usuarioRepository.findByStatusIsNullOrStatusNot(UserStatus.DELETED).stream()
                 .map(this::toDTO)
                 .collect(Collectors.toList());
     }
@@ -73,7 +74,7 @@ public class UsuarioServiceImpl implements UsuarioService {
     @Override
     public PageResponseDTO<UsuarioResponseDTO> listarPaginado(PageRequestDTO request) {
         Pageable pageable = PageRequest.of(request.getPage(), request.getSize());
-        Page<UsuarioEntity> page = usuarioRepository.findAll(pageable);
+        Page<UsuarioEntity> page = usuarioRepository.findByStatusIsNullOrStatusNot(UserStatus.DELETED, pageable);
 
         List<UsuarioResponseDTO> conteudo = page.getContent().stream()
                 .map(this::toDTO)
@@ -111,10 +112,12 @@ public class UsuarioServiceImpl implements UsuarioService {
 
     @Override
     public void deletar(UUID id) {
-        if (!usuarioRepository.existsById(id)) {
-            throw new RuntimeException("Usuário não encontrado com o ID: " + id);
-        }
-        usuarioRepository.deleteById(id);
+        // Exclusão lógica: o registro fica (histórico de chamados), mas a conta para de funcionar
+        UsuarioEntity entity = usuarioRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Usuário não encontrado com o ID: " + id));
+        entity.setStatus(UserStatus.DELETED);
+        entity.setFcmToken(null); // para de receber notificações
+        usuarioRepository.save(entity);
     }
 
     // ---------------------------------------------------------

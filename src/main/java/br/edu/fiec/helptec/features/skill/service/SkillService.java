@@ -80,6 +80,7 @@ public class SkillService {
 
         return usuarioRepository.findAllById(idsUsuarios).stream()
                 .filter(u -> u.getRole() == UserRole.SUPORTE)
+                .filter(UsuarioEntity::isEnabled) // ignora contas DELETED
                 .map(u -> new UsuarioResponseDTO(u.getId(), u.getNome(), u.getEmail(), u.getRole()))
                 .toList();
     }

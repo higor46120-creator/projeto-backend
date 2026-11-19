@@ -139,6 +139,9 @@ public class ChamadoService {
         if (suporte.getRole() != UserRole.SUPORTE) {
             throw new IllegalStateException("Usuário selecionado não possui papel de suporte");
         }
+        if (!suporte.isEnabled()) {
+            throw new IllegalStateException("Usuário de suporte desativado");
+        }
 
         chamado.setIdSuporte(idSuporte);
         chamado.setStatus(StatusChamado.EM_ATENDIMENTO);

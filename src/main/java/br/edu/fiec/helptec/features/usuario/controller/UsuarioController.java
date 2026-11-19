@@ -111,7 +111,8 @@ public class UsuarioController {
     }
 
     @McpTool(name = "excluir_usuario",
-            description = "Exclui um usuário pelo id (UUID). Não pode ser desfeito.",
+            description = "Desativa um usuário pelo id (UUID): a conta fica com status DELETED, "
+                    + "some das listagens e não consegue mais entrar. O histórico de chamados é mantido.",
             annotations = @McpTool.McpAnnotations(title = "Excluir usuário", readOnlyHint = false,
                     destructiveHint = true, idempotentHint = true, openWorldHint = false))
     @DeleteMapping("/{id}")
