@@ -3,6 +3,7 @@ package br.edu.fiec.helptec.config;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
@@ -11,7 +12,6 @@ import org.springframework.security.config.annotation.web.configuration.EnableWe
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
-import org.springframework.security.web.authentication.HttpStatusEntryPoint;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
@@ -62,6 +62,9 @@ public class SecurityConfig {
             "/webjars/**"
     };
 
+    // Endpoint do servidor MCP (spring.ai.mcp.server.streamable-http.mcp-endpoint, padrão /mcp)
+    private static final String[] MCP_MATCHERS = {"/mcp", "/mcp/**"};
+
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
@@ -79,12 +82,21 @@ public class SecurityConfig {
                 // Configura autorização das rotas
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(PUBLIC_MATCHERS).permitAll()
+                        // Servidor MCP (agentes de IA): exige o mesmo JWT da API no cabeçalho
+                        // "Authorization: Bearer <token>". As permissões por papel (@PreAuthorize)
+                        // de cada ferramenta continuam valendo.
+                        .requestMatchers(MCP_MATCHERS).authenticated()
                         .anyRequest().authenticated()
                 )
 
                 // Trata exceções de não autorizado para retornar HTTP 401 em JSON em vez de redirecionar para HTML do Google
                 .exceptionHandling(exception -> exception
-                        .authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED))
+                        // O cabeçalho WWW-Authenticate indica aos clientes (inclusive os MCP)
+                        // que o acesso é por token Bearer (JWT)
+                        .authenticationEntryPoint((request, response, authException) -> {
+                            response.setHeader(HttpHeaders.WWW_AUTHENTICATE, "Bearer realm=\"helptec\"");
+                            response.setStatus(HttpStatus.UNAUTHORIZED.value());
+                        })
                 )
 
                 .authenticationProvider(authenticationProvider)
@@ -125,6 +137,8 @@ public class SecurityConfig {
                 .toList());
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
         configuration.setAllowedHeaders(List.of("*"));
+        // Cabeçalhos do protocolo MCP que clientes no navegador precisam ler
+        configuration.setExposedHeaders(List.of("Mcp-Session-Id", "MCP-Protocol-Version", HttpHeaders.WWW_AUTHENTICATE));
         configuration.setAllowCredentials(false);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
