@@ -38,6 +38,7 @@
 		<sonar.coverage.jacoco.xmlReportPaths>${project.build.directory}/site/jacoco/jacoco.xml</sonar.coverage.jacoco.xmlReportPaths>
 		<!-- Classes só de dados ou de configuração não contam na cobertura -->
 		<sonar.coverage.exclusions>**/model/dto/**,**/HelptecApplication.java,**/config/OpenApiConfig.java</sonar.coverage.exclusions>
+		<spring-ai.version>2.0.0</spring-ai.version>
 	</properties>
 	<dependencies>
 		<!-- Banco de dados: MongoDB (substitui spring-boot-starter-data-jpa + MySQL) -->
@@ -127,6 +128,12 @@
         </dependency>
 
 
+		<!-- ===== MCP: expõe os endpoints anotados com @McpTool para agentes de IA em /mcp ===== -->
+		<dependency>
+			<groupId>org.springframework.ai</groupId>
+			<artifactId>spring-ai-starter-mcp-server-webmvc</artifactId>
+		</dependency>
+
 		<!-- ===== AWS (integração com a nuvem da Amazon) ===== -->
 		<!-- https://mvnrepository.com/artifact/software.amazon.awssdk/aws-sdk-java -->
 		<dependency>
@@ -150,6 +157,18 @@
 			<version>2.35.11</version>
 		</dependency>
 	</dependencies>
+
+	<dependencyManagement>
+		<dependencies>
+			<dependency>
+				<groupId>org.springframework.ai</groupId>
+				<artifactId>spring-ai-bom</artifactId>
+				<version>${spring-ai.version}</version>
+				<type>pom</type>
+				<scope>import</scope>
+			</dependency>
+		</dependencies>
+	</dependencyManagement>
 	<build>
 		<plugins>
 			<plugin>

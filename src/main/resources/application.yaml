@@ -10,6 +10,26 @@ spring:
   main:
     allow-bean-definition-overriding: true
 
+  # ===== MCP (Model Context Protocol) =====
+  # Os métodos dos controllers anotados com @McpTool viram ferramentas para agentes de IA
+  # no endpoint POST /mcp. O agente envia o mesmo JWT da API (Authorization: Bearer ...),
+  # então valem as mesmas permissões (@PreAuthorize) do usuário dono do token.
+  ai:
+    mcp:
+      server:
+        enabled: ${MCP_ENABLED:true}
+        name: helptec
+        version: 1.0.0
+        type: SYNC
+        protocol: STATELESS   # sem sessão em memória: funciona com várias réplicas no Kubernetes
+        instructions: >
+          Sistema HelpTec de chamados de suporte de TI da FIEC. Fluxo: solicitante abre o chamado
+          (AGUARDANDO_APROVACAO) -> aprovador aprova/reprova -> gerente faz a triagem ou o suporte
+          inicia o atendimento (EM_ATENDIMENTO) -> suporte resolve (RESOLVIDO). Use meu_usuario
+          para saber o perfil do token antes de agir.
+        annotation-scanner:
+          enabled: true
+
   # ===== MongoDB =====
   # Sem MONGODB_URI usa o MongoDB local (localhost:27017). Ver perfis "local" e "professor".
   # A string de conexão (com usuário e senha) vem SÓ da variável de ambiente MONGODB_URI.
