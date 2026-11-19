@@ -7,6 +7,7 @@ import br.edu.fiec.helptec.features.salas.repository.SalasRepository;
 import br.edu.fiec.helptec.features.skill.Skill;
 import br.edu.fiec.helptec.features.skill.repository.SkillRepository;
 import br.edu.fiec.helptec.features.usuario.model.entity.UserRole;
+import br.edu.fiec.helptec.features.usuario.model.entity.UserStatus;
 import br.edu.fiec.helptec.features.usuario.model.entity.UsuarioEntity;
 import br.edu.fiec.helptec.features.usuario.repository.UsuarioRepository;
 import org.slf4j.Logger;
@@ -16,6 +17,7 @@ import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -27,6 +29,7 @@ import java.util.UUID;
  * Cada parte só é criada se a collection estiver vazia: rodar de novo não duplica nada.
  */
 @Component
+@Order(10) // antes do SuperAdminInicializador (@Order(100))
 @ConditionalOnProperty(name = "app.seed.enabled", havingValue = "true")
 public class DadosIniciaisLocal implements ApplicationRunner {
 
@@ -60,6 +63,7 @@ public class DadosIniciaisLocal implements ApplicationRunner {
     @Override
     public void run(ApplicationArguments args) {
         criarUsuariosDeTeste();
+        criarSuperAdminDeTeste();
         liberarAdminGoogle();
         criarSalas();
         criarEquipamentos();
@@ -75,11 +79,20 @@ public class DadosIniciaisLocal implements ApplicationRunner {
                 usuario("Aprovador Teste", "aprovador@helptec.local", UserRole.APROVADOR),
                 usuario("Gerente Teste", "gerente@helptec.local", UserRole.GERENTE),
                 usuario("Suporte Teste", "suporte@helptec.local", UserRole.SUPORTE),
-                usuario("Admin Teste", "admin@helptec.local", UserRole.ADMIN)
+                usuario("Admin Teste", "admin@helptec.local", UserRole.ADMIN),
+                usuario("Super Admin Teste", "superadmin@helptec.local", UserRole.SUPER_ADMIN)
         );
         usuarioRepository.saveAll(usuarios);
         log.info("[seed] {} usuários de teste criados (senha: {}). Ex.: admin@helptec.local",
                 usuarios.size(), senhaTeste);
+    }
+
+    /** Bancos locais criados antes do SUPER_ADMIN também ganham o usuário de teste. */
+    private void criarSuperAdminDeTeste() {
+        String email = "superadmin@helptec.local";
+        if (usuarioRepository.findByEmail(email).isPresent()) return;
+        usuarioRepository.save(usuario("Super Admin Teste", email, UserRole.SUPER_ADMIN));
+        log.info("[seed] {} criado (senha: {})", email, senhaTeste);
     }
 
     /** O login Google só aceita e-mails cadastrados: libera o e-mail informado como ADMIN. */
@@ -98,7 +111,8 @@ public class DadosIniciaisLocal implements ApplicationRunner {
                     novo.setArea(AREA_TESTE);
                     return novo;
                 });
-        if (usuario.getRole() != UserRole.ADMIN) {
+        // Não rebaixa quem já é ADMIN ou SUPER_ADMIN
+        if (usuario.getRole() != UserRole.ADMIN && usuario.getRole() != UserRole.SUPER_ADMIN) {
             usuario.setRole(UserRole.ADMIN);
             usuarioRepository.save(usuario);
             log.info("[seed] {} liberado como ADMIN para o login com Google", email);
@@ -139,7 +153,9 @@ public class DadosIniciaisLocal implements ApplicationRunner {
     }
 
     private UsuarioEntity usuario(String nome, String email, UserRole role) {
-        return new UsuarioEntity(nome, email, passwordEncoder.encode(senhaTeste), null, role, AREA_TESTE);
+        UsuarioEntity usuario = new UsuarioEntity(nome, email, passwordEncoder.encode(senhaTeste), null, role, AREA_TESTE);
+        usuario.setStatus(UserStatus.CONFIRMED);
+        return usuario;
     }
 
     private Equipamento equipamento(String nome, String patrimonio, String tipo, Double preco) {

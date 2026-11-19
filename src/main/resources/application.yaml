@@ -68,6 +68,10 @@ spring:
       max-request-size: 100MB
 
 app:
+  # E-mail promovido a SUPER_ADMIN na subida (único que pode usar POST /usuarios/csv).
+  # O usuário precisa já existir. Ex.: SUPER_ADMIN_EMAIL=matheus27547@fiec.edu.br
+  super-admin:
+    email: ${SUPER_ADMIN_EMAIL:}
   oauth2:
     redirect-uri: ${FRONTEND_OAUTH2_REDIRECT_URI:http://localhost:3000/oauth2/redirect}
   firebase:

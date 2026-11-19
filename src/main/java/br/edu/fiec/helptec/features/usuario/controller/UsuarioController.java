@@ -4,6 +4,7 @@ import br.edu.fiec.helptec.config.UserContext;
 import br.edu.fiec.helptec.features.commons.PageRequestDTO;
 import br.edu.fiec.helptec.features.commons.PageResponseDTO;
 import br.edu.fiec.helptec.features.usuario.model.dto.CreateUsuarioRequestDTO;
+import br.edu.fiec.helptec.features.usuario.model.dto.UsuarioCsvResultadoDTO;
 import br.edu.fiec.helptec.features.usuario.model.dto.MeResponseDTO;
 import br.edu.fiec.helptec.features.usuario.model.dto.UsuarioResponseDTO;
 import br.edu.fiec.helptec.features.usuario.model.entity.UsuarioEntity;
@@ -11,9 +12,13 @@ import br.edu.fiec.helptec.features.usuario.service.UsuarioService;
 import org.springframework.ai.mcp.annotation.McpTool;
 import org.springframework.ai.mcp.annotation.McpToolParam;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.io.IOException;
 import java.util.List;
 import java.util.UUID;
 
@@ -37,6 +42,14 @@ public class UsuarioController {
     public UsuarioResponseDTO criar(
             @McpToolParam(description = "Dados do novo usuário") @RequestBody CreateUsuarioRequestDTO request) {
         return usuarioService.criar(request);
+    }
+
+    // Importação em lote: somente SUPER_ADMIN. Recebe arquivo (multipart), por isso fica
+    // só na API HTTP, sem @McpTool. Modelo do CSV: nome,email,senha,perfil,area
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    @PostMapping(value = "/csv", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public UsuarioCsvResultadoDTO criarViaCsv(@RequestPart("file") MultipartFile file) throws IOException {
+        return usuarioService.importarCsv(file);
     }
 
     @McpTool(name = "listar_usuarios",

@@ -39,6 +39,9 @@ public class UsuarioEntity implements UserDetails {
 
     private UserRole role;
 
+    // Situação da conta. Registros antigos (sem o campo) contam como CONFIRMED.
+    private UserStatus status;
+
     // UUID do usuário responsável por aprovar os chamados abertos por este usuário.
     // Nulo para quem não possui aprovador definido (ex: o próprio aprovador, admins, etc).
 
@@ -67,7 +70,14 @@ public class UsuarioEntity implements UserDetails {
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
-        // ADMIN acumula a permissão de USER também
+        // SUPER_ADMIN acumula ADMIN e USER; ADMIN acumula USER
+        if (this.role == UserRole.SUPER_ADMIN) {
+            return List.of(
+                    new SimpleGrantedAuthority("ROLE_SUPER_ADMIN"),
+                    new SimpleGrantedAuthority("ROLE_ADMIN"),
+                    new SimpleGrantedAuthority("ROLE_USER")
+            );
+        }
         if (this.role == UserRole.ADMIN) {
             return List.of(
                     new SimpleGrantedAuthority("ROLE_ADMIN"),
@@ -75,6 +85,11 @@ public class UsuarioEntity implements UserDetails {
             );
         }
         return List.of(new SimpleGrantedAuthority(this.role.getRole()));
+    }
+
+    /** Status da conta; nulo (cadastros anteriores ao campo) vale como CONFIRMED. */
+    public UserStatus getStatus() {
+        return this.status != null ? this.status : UserStatus.CONFIRMED;
     }
 
     // =======================================================
@@ -106,9 +121,10 @@ public class UsuarioEntity implements UserDetails {
         return true;
     }
 
+    // Conta DELETED não autentica (login, Google e token JWT)
     @Override
     public boolean isEnabled() {
-        return true;
+        return getStatus() != UserStatus.DELETED;
     }
 
 }

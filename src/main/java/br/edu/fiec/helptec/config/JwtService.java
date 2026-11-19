@@ -79,7 +79,8 @@ public class JwtService {
     // Valida se o token pertence ao usuário informado e se não está expirado
     public boolean isTokenValid(String token, UserDetails userDetails) {
         final String username = extractUsername(token);
-        return (username.equals(userDetails.getUsername())) && !isTokenExpired(token);
+        // Conta desativada (status DELETED) perde o acesso mesmo com token ainda válido
+        return (username.equals(userDetails.getUsername())) && !isTokenExpired(token) && userDetails.isEnabled();
     }
 
     private boolean isTokenExpired(String token) {

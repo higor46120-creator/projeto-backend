@@ -1,6 +1,7 @@
 package br.edu.fiec.helptec.config;
 
 import br.edu.fiec.helptec.features.usuario.model.entity.UserRole;
+import br.edu.fiec.helptec.features.usuario.model.entity.UserStatus;
 import br.edu.fiec.helptec.features.usuario.model.entity.UsuarioEntity;
 import br.edu.fiec.helptec.features.usuario.repository.UsuarioRepository;
 import jakarta.servlet.ServletException;
@@ -53,6 +54,13 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
                 .map(UsuarioEntity.class::cast)
                 .orElseGet(() -> criarUsuarioAPartirDoGoogle(email, nome));
 
+        // O Google confirmou o e-mail: marca a conta como CONFIRMED
+        // (conta DELETED continua bloqueada: o filtro JWT recusa o token gerado)
+        if (usuario.getStatus() == UserStatus.NOT_CONFIRMED) {
+            usuario.setStatus(UserStatus.CONFIRMED);
+            usuarioRepository.save(usuario);
+        }
+
         String jwt = jwtService.generateTokenFromOAuth2User(oAuth2User, usuario);
 
         String targetUrl = UriComponentsBuilder.fromUriString(redirectUri)
@@ -69,6 +77,7 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
         novoUsuario.setEmail(email);
         novoUsuario.setPassword(passwordEncoder.encode(UUID.randomUUID().toString()));
         novoUsuario.setRole(UserRole.USER);
+        novoUsuario.setStatus(UserStatus.CONFIRMED); // e-mail confirmado pelo Google
 
         return usuarioRepository.save(novoUsuario);
     }

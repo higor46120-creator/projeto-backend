@@ -153,7 +153,8 @@ public class ChamadoService {
         Chamado chamado = buscarOuFalhar(idChamado);
         validarStatus(chamado, StatusChamado.APROVADO);
 
-        if (suporte.getRole() != UserRole.SUPORTE && suporte.getRole() != UserRole.ADMIN) {
+        if (suporte.getRole() != UserRole.SUPORTE && suporte.getRole() != UserRole.ADMIN
+                && suporte.getRole() != UserRole.SUPER_ADMIN) {
             throw new IllegalStateException("Só usuários de suporte podem iniciar o atendimento");
         }
 
