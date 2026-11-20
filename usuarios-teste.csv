@@ -1,0 +1,14 @@
+nome,email,senha,perfil,area
+Ana Souza,ana.souza@fiec.edu.br,helptec123,USER,Informática
+Bruno Lima,bruno.lima@fiec.edu.br,helptec123,APROVADOR,Informática
+Carla Mendes,carla.mendes@fiec.edu.br,helptec123,GERENTE,Informática
+Diego Rocha,diego.rocha@fiec.edu.br,helptec123,SUPORTE,Informática
+Elisa Prado,elisa.prado@fiec.edu.br,helptec123,ADMIN,Secretaria
+Fábio Nunes,fabio.nunes@fiec.edu.br,,,
+Gabi Torres,gabi.torres@fiec.edu.br,helptec123,suporte,Laboratórios
+,sem.nome@fiec.edu.br,helptec123,USER,Informática
+Email Invalido,email-invalido,helptec123,USER,Informática
+Ana Repetida,ana.souza@fiec.edu.br,helptec123,USER,Informática
+Admin Existente,admin@helptec.local,helptec123,ADMIN,Informática
+Perfil Errado,perfil.errado@fiec.edu.br,helptec123,DIRETOR,Informática
+Querendo Ser Chefe,chefe@fiec.edu.br,helptec123,SUPER_ADMIN,Informática
