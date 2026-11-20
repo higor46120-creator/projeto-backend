@@ -44,8 +44,10 @@ public class ApplicationConfig {
     /**
      * Define o algoritmo de criptografia para as senhas (BCrypt).
      */
+    // static: o bean não depende desta classe de configuração, evitando o ciclo
+    // ApplicationConfig -> UserDetailsService (UsuarioServiceImpl) -> PasswordEncoder
     @Bean
-    public PasswordEncoder passwordEncoder() {
+    public static PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
     }
 }

@@ -8,6 +8,7 @@ import br.edu.fiec.helptec.features.auth.models.RegisterRequest;
 import br.edu.fiec.helptec.features.auth.service.AuthService;
 import br.edu.fiec.helptec.features.auth.service.GoogleTokenVerifier;
 import br.edu.fiec.helptec.features.usuario.model.entity.UserRole;
+import br.edu.fiec.helptec.features.usuario.model.entity.UserStatus;
 import br.edu.fiec.helptec.features.usuario.model.entity.UsuarioEntity;
 import br.edu.fiec.helptec.features.usuario.repository.UsuarioRepository;
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
@@ -51,6 +52,7 @@ public class AuthServiceImpl implements AuthService {
         usuarioEntity.setPassword(passwordEncoder.encode(request.password())); // Criptografa a senha
         usuarioEntity.setFcmToken(request.fcmToken());
         usuarioEntity.setRole(UserRole.USER); // Define o perfil padrão como USER
+        usuarioEntity.setStatus(UserStatus.NOT_CONFIRMED); // e-mail ainda não confirmado
 
         usuarioRepository.save(usuarioEntity);
     }
@@ -93,6 +95,17 @@ public class AuthServiceImpl implements AuthService {
                 .map(u -> (UsuarioEntity) u)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
                         "Usuário não cadastrado no HelpTec"));
+
+        // Conta desativada não entra
+        if (!usuario.isEnabled()) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Usuário desativado");
+        }
+
+        // O Google confirmou o e-mail: marca a conta como CONFIRMED
+        if (usuario.getStatus() == UserStatus.NOT_CONFIRMED) {
+            usuario.setStatus(UserStatus.CONFIRMED);
+            usuarioRepository.save(usuario);
+        }
 
         // 4. Opcional: atualiza o token de push do aparelho
         if (request.fcmToken() != null && !request.fcmToken().isBlank()) {
