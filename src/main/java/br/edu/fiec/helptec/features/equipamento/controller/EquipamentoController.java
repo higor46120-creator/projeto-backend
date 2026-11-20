@@ -1,5 +1,6 @@
 package br.edu.fiec.helptec.features.equipamento.controller;
 
+import lombok.RequiredArgsConstructor;
 import br.edu.fiec.helptec.features.commons.PageRequestDTO;
 import br.edu.fiec.helptec.features.commons.PageResponseDTO;
 import br.edu.fiec.helptec.features.equipamento.model.dto.EquipamentoDTO;
@@ -7,17 +8,16 @@ import br.edu.fiec.helptec.features.equipamento.model.dto.EquipamentoFilterDTO;
 import br.edu.fiec.helptec.features.equipamento.service.EquipamentoService;
 import org.springframework.ai.mcp.annotation.McpTool;
 import org.springframework.ai.mcp.annotation.McpToolParam;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
 /** Equipamentos/patrimônios (também expostos como ferramentas MCP para agentes de IA). */
 @RestController
 @RequestMapping("/api/equipamentos")
+@RequiredArgsConstructor
 public class EquipamentoController {
 
-    @Autowired
-    private EquipamentoService equipamentoService;
+    private final EquipamentoService equipamentoService;
 
     @McpTool(name = "buscar_equipamentos",
             description = "Lista equipamentos/patrimônios com filtros opcionais e paginação. "

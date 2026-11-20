@@ -1,11 +1,11 @@
 package br.edu.fiec.helptec.features.skill.controller;
 
+import lombok.RequiredArgsConstructor;
 import br.edu.fiec.helptec.features.skill.model.dto.SkillDTO;
 import br.edu.fiec.helptec.features.skill.service.SkillService;
 import br.edu.fiec.helptec.features.usuario.model.dto.UsuarioResponseDTO;
 import org.springframework.ai.mcp.annotation.McpTool;
 import org.springframework.ai.mcp.annotation.McpToolParam;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
@@ -15,10 +15,10 @@ import java.util.UUID;
 /** Skills (competências) dos técnicos de suporte, também expostas como ferramentas MCP. */
 @RestController
 @RequestMapping("/api/skills")
+@RequiredArgsConstructor
 public class SkillController {
 
-    @Autowired
-    private SkillService skillService;
+    private final SkillService skillService;
 
     @McpTool(name = "listar_skills",
             description = "Lista todas as skills (competências técnicas) cadastradas.",

@@ -65,6 +65,10 @@ public class SecurityConfig {
     // Endpoint do servidor MCP (spring.ai.mcp.server.streamable-http.mcp-endpoint, padrão /mcp)
     private static final String[] MCP_MATCHERS = {"/mcp", "/mcp/**"};
 
+    // java:S4502 (CSRF desativado): seguro aqui. A API é stateless e autentica só pelo JWT no
+    // cabeçalho Authorization; não há cookie de sessão que o navegador envie sozinho, então
+    // um site de terceiros não consegue forjar uma requisição autenticada.
+    @SuppressWarnings("java:S4502")
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http

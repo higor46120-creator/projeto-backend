@@ -1,12 +1,12 @@
 package br.edu.fiec.helptec.features.salas.service;
 
+import lombok.RequiredArgsConstructor;
 import br.edu.fiec.helptec.features.commons.PageRequestDTO;
 import br.edu.fiec.helptec.features.commons.PageResponseDTO;
 import br.edu.fiec.helptec.features.salas.Salas;
 import br.edu.fiec.helptec.features.salas.model.dto.SalasDTO;
 import br.edu.fiec.helptec.features.salas.model.dto.SalasFilterDTO;
 import br.edu.fiec.helptec.features.salas.repository.SalasRepository;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.stereotype.Service;
 
@@ -16,10 +16,10 @@ import java.util.List;
 
 
 @Service
+@RequiredArgsConstructor
 public class SalasService {
 
-    @Autowired
-    private SalasRepository salasRepository;
+    private final SalasRepository salasRepository;
 
     public PageResponseDTO<SalasDTO> buscarComFiltro(SalasFilterDTO filtro, PageRequestDTO pageRequest) {
         Page<Salas> page = salasRepository.buscarGenerica(filtro, pageRequest);

@@ -1,12 +1,12 @@
 package br.edu.fiec.helptec.features.chamado.service;
 
+import lombok.RequiredArgsConstructor;
 import br.edu.fiec.helptec.config.FirebaseStorageService;
 import br.edu.fiec.helptec.config.aws.S3StorageService;
 import br.edu.fiec.helptec.features.chamado.ChamadoAnexo;
 import br.edu.fiec.helptec.features.chamado.model.dto.ChamadoAnexoDTO;
 import br.edu.fiec.helptec.features.chamado.repository.ChamadoAnexoRepository;
 import net.coobird.thumbnailator.Thumbnails;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -19,16 +19,14 @@ import java.util.List;
 import java.util.UUID;
 
 @Service
+@RequiredArgsConstructor
 public class ChamadoAnexoService {
 
-    @Autowired
-    private ChamadoAnexoRepository chamadoAnexoRepository;
+    private final ChamadoAnexoRepository chamadoAnexoRepository;
 
-    @Autowired
-    private FirebaseStorageService firebaseStorageService;
+    private final FirebaseStorageService firebaseStorageService;
 
-    @Autowired
-    private S3StorageService s3StorageService;
+    private final S3StorageService s3StorageService;
 
     // true: anexos vão para o bucket S3 da AWS; false: Firebase Storage
     @Value("${cloud.aws.s3.enabled:true}")

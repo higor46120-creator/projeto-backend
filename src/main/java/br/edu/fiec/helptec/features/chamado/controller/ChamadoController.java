@@ -1,5 +1,6 @@
 package br.edu.fiec.helptec.features.chamado.controller;
 
+import lombok.RequiredArgsConstructor;
 import br.edu.fiec.helptec.config.UserContext;
 import br.edu.fiec.helptec.features.chamado.model.dto.ChamadoAnexoDTO;
 import br.edu.fiec.helptec.features.chamado.model.dto.ChamadoDTO;
@@ -12,7 +13,6 @@ import br.edu.fiec.helptec.features.commons.PageResponseDTO;
 import br.edu.fiec.helptec.features.usuario.model.entity.UsuarioEntity;
 import org.springframework.ai.mcp.annotation.McpTool;
 import org.springframework.ai.mcp.annotation.McpToolParam;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -30,13 +30,12 @@ import java.util.List;
  */
 @RestController
 @RequestMapping("/api/chamados")
+@RequiredArgsConstructor
 public class ChamadoController {
 
-    @Autowired
-    private ChamadoService chamadoService;
+    private final ChamadoService chamadoService;
 
-    @Autowired
-    private ChamadoAnexoService chamadoAnexoService;
+    private final ChamadoAnexoService chamadoAnexoService;
 
     @McpTool(name = "buscar_chamados",
             description = "Lista chamados de suporte de TI com filtros opcionais e paginação. "

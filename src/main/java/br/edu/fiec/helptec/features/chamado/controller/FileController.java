@@ -1,8 +1,8 @@
 package br.edu.fiec.helptec.features.chamado.controller;
 
+import lombok.RequiredArgsConstructor;
 import br.edu.fiec.helptec.features.chamado.ChamadoAnexo;
 import br.edu.fiec.helptec.features.chamado.repository.ChamadoAnexoRepository;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.CacheControl;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -19,10 +19,10 @@ import java.util.concurrent.TimeUnit;
 
 @RestController
 @RequestMapping("/images")
+@RequiredArgsConstructor
 public class FileController {
 
-    @Autowired
-    private ChamadoAnexoRepository chamadoAnexoRepository;
+    private final ChamadoAnexoRepository chamadoAnexoRepository;
 
     private static final String PASTA_UPLOADS = "uploads";
 

@@ -1,15 +1,15 @@
 package br.edu.fiec.helptec.config;
 
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 @Configuration
+@RequiredArgsConstructor
 public class WebMvcConfig implements WebMvcConfigurer {
 
-    @Autowired
-    private MyRequestInterceptor myRequestInterceptor;
+    private final MyRequestInterceptor myRequestInterceptor;
 
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
