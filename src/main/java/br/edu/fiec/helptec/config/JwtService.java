@@ -26,6 +26,9 @@ public class JwtService {
 
     private static final Logger log = LoggerFactory.getLogger(JwtService.class);
 
+    // Gerador de números aleatórios criado uma vez e reaproveitado (regra do Sonar: java:S2119)
+    private static final SecureRandom RANDOM = new SecureRandom();
+
     // Chave secreta em Base64 (mínimo 32 bytes), vinda da variável de ambiente JWT_SECRET.
     // Gerar uma: openssl rand -base64 64
     // NUNCA colocar uma chave fixa no código: o repositório é público.
@@ -39,7 +42,7 @@ public class JwtService {
     void validarChave() {
         if (secretKey == null || secretKey.isBlank()) {
             byte[] aleatoria = new byte[64];
-            new SecureRandom().nextBytes(aleatoria);
+            RANDOM.nextBytes(aleatoria);
             secretKey = Base64.getEncoder().encodeToString(aleatoria);
             log.warn("JWT_SECRET não definido: usando chave aleatória temporária. "
                     + "Os tokens deixam de valer quando a aplicação reinicia. Defina JWT_SECRET em produção.");
@@ -76,7 +79,8 @@ public class JwtService {
     // Valida se o token pertence ao usuário informado e se não está expirado
     public boolean isTokenValid(String token, UserDetails userDetails) {
         final String username = extractUsername(token);
-        return (username.equals(userDetails.getUsername())) && !isTokenExpired(token);
+        // Conta desativada (status DELETED) perde o acesso mesmo com token ainda válido
+        return (username.equals(userDetails.getUsername())) && !isTokenExpired(token) && userDetails.isEnabled();
     }
 
     private boolean isTokenExpired(String token) {

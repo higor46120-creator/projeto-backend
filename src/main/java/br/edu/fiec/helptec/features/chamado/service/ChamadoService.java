@@ -1,5 +1,6 @@
 package br.edu.fiec.helptec.features.chamado.service;
 
+import lombok.RequiredArgsConstructor;
 import br.edu.fiec.helptec.features.chamado.Chamado;
 import br.edu.fiec.helptec.features.chamado.StatusChamado;
 import br.edu.fiec.helptec.features.chamado.model.dto.ChamadoCsvDTO;
@@ -13,7 +14,6 @@ import br.edu.fiec.helptec.features.usuario.model.entity.UsuarioEntity;
 import br.edu.fiec.helptec.features.usuario.repository.UsuarioRepository;
 import com.opencsv.bean.CsvToBean;
 import com.opencsv.bean.CsvToBeanBuilder;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -27,13 +27,12 @@ import java.util.List;
 import java.util.UUID;
 
 @Service
+@RequiredArgsConstructor
 public class ChamadoService {
 
-    @Autowired
-    private ChamadoRepository chamadoRepository;
+    private final ChamadoRepository chamadoRepository;
 
-    @Autowired
-    private UsuarioRepository usuarioRepository;
+    private final UsuarioRepository usuarioRepository;
 
     public PageResponseDTO<ChamadoDTO> buscarComFiltro(ChamadoFilterDTO filtro, PageRequestDTO pageRequest) {
         Page<Chamado> page = chamadoRepository.buscarGenerica(filtro, pageRequest);
@@ -139,6 +138,9 @@ public class ChamadoService {
         if (suporte.getRole() != UserRole.SUPORTE) {
             throw new IllegalStateException("Usuário selecionado não possui papel de suporte");
         }
+        if (!suporte.isEnabled()) {
+            throw new IllegalStateException("Usuário de suporte desativado");
+        }
 
         chamado.setIdSuporte(idSuporte);
         chamado.setStatus(StatusChamado.EM_ATENDIMENTO);
@@ -153,7 +155,8 @@ public class ChamadoService {
         Chamado chamado = buscarOuFalhar(idChamado);
         validarStatus(chamado, StatusChamado.APROVADO);
 
-        if (suporte.getRole() != UserRole.SUPORTE && suporte.getRole() != UserRole.ADMIN) {
+        if (suporte.getRole() != UserRole.SUPORTE && suporte.getRole() != UserRole.ADMIN
+                && suporte.getRole() != UserRole.SUPER_ADMIN) {
             throw new IllegalStateException("Só usuários de suporte podem iniciar o atendimento");
         }
 

@@ -190,4 +190,27 @@ class ChamadoControllerTest {
                 .andExpect(status().isNoContent());
         verify(chamadoService).deletar(1L);
     }
+
+    @Test
+    @DisplayName("PATCH /reprovar usa o id do aprovador logado")
+    void deveReprovarComUsuarioLogado() throws Exception {
+        //mocks
+        UsuarioEntity aprovador = Fabrica.usuario(UserRole.APROVADOR);
+        UserContext.setUser(aprovador);
+        when(chamadoService.reprovar(1L, aprovador.getId())).thenReturn(dto(1L, StatusChamado.REPROVADO));
+
+        //impl + asserts
+        mockMvc.perform(patch("/api/chamados/1/reprovar"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("REPROVADO"));
+    }
+
+    @Test
+    @DisplayName("PATCH /reprovar sem usuário logado devolve 401")
+    void naoDeveReprovarSemLogin() throws Exception {
+        //impl + asserts
+        mockMvc.perform(patch("/api/chamados/1/reprovar"))
+                .andExpect(status().isUnauthorized());
+        verify(chamadoService, never()).reprovar(any(), any());
+    }
 }

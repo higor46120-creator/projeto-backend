@@ -10,6 +10,26 @@ spring:
   main:
     allow-bean-definition-overriding: true
 
+  # ===== MCP (Model Context Protocol) =====
+  # Os métodos dos controllers anotados com @McpTool viram ferramentas para agentes de IA
+  # no endpoint POST /mcp. O agente envia o mesmo JWT da API (Authorization: Bearer ...),
+  # então valem as mesmas permissões (@PreAuthorize) do usuário dono do token.
+  ai:
+    mcp:
+      server:
+        enabled: ${MCP_ENABLED:true}
+        name: helptec
+        version: 1.0.0
+        type: SYNC
+        protocol: STATELESS   # sem sessão em memória: funciona com várias réplicas no Kubernetes
+        instructions: >
+          Sistema HelpTec de chamados de suporte de TI da FIEC. Fluxo: solicitante abre o chamado
+          (AGUARDANDO_APROVACAO) -> aprovador aprova/reprova -> gerente faz a triagem ou o suporte
+          inicia o atendimento (EM_ATENDIMENTO) -> suporte resolve (RESOLVIDO). Use meu_usuario
+          para saber o perfil do token antes de agir.
+        annotation-scanner:
+          enabled: true
+
   # ===== MongoDB =====
   # Sem MONGODB_URI usa o MongoDB local (localhost:27017). Ver perfis "local" e "professor".
   # A string de conexão (com usuário e senha) vem SÓ da variável de ambiente MONGODB_URI.
@@ -48,6 +68,10 @@ spring:
       max-request-size: 100MB
 
 app:
+  # E-mail promovido a SUPER_ADMIN na subida (único que pode usar POST /usuarios/csv).
+  # O usuário precisa já existir. Ex.: SUPER_ADMIN_EMAIL=matheus27547@fiec.edu.br
+  super-admin:
+    email: ${SUPER_ADMIN_EMAIL:}
   oauth2:
     redirect-uri: ${FRONTEND_OAUTH2_REDIRECT_URI:http://localhost:3000/oauth2/redirect}
   firebase:
@@ -65,3 +89,18 @@ api:
     token:
       # Chave do JWT em Base64. Gerar com: openssl rand -base64 64
       secret: ${JWT_SECRET:}
+
+# ===== AWS =====
+# Os valores vêm de variáveis de ambiente (IntelliJ, ~/.aws, Kubernetes). NUNCA escreva as chaves aqui.
+cloud:
+  aws:
+    region:
+      static: ${AWS_REGION:us-east-1}
+    credentials:
+      access-key: ${AWS_ACCESS_KEY_ID:}
+      secret-key: ${AWS_SECRET_ACCESS_KEY:}
+      session-token: ${AWS_SESSION_TOKEN:}   # só nas chaves temporárias da AWS Academy
+    s3:
+      bucket: ${AWS_S3_BUCKET:fiec-tcc-helptec}
+      # true: anexos dos chamados vão para o S3; false: continuam no Firebase Storage
+      enabled: ${AWS_S3_ENABLED:true}
