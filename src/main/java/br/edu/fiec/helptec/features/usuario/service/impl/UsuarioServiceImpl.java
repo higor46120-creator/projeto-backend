@@ -34,13 +34,10 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 @Service
 public class UsuarioServiceImpl implements UsuarioService {
-
-    private static final Pattern EMAIL = Pattern.compile("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$");
 
     private final UsuarioRepository usuarioRepository;
     private final PasswordEncoder passwordEncoder;
@@ -173,7 +170,7 @@ public class UsuarioServiceImpl implements UsuarioService {
         if (nome == null) {
             throw new IllegalArgumentException("nome é obrigatório");
         }
-        if (email == null || !EMAIL.matcher(email).matches()) {
+        if (!emailValido(email)) {
             throw new IllegalArgumentException("e-mail inválido");
         }
         if (emailsDoArquivo.contains(email)) {
@@ -193,6 +190,23 @@ public class UsuarioServiceImpl implements UsuarioService {
         entity.setPassword(passwordEncoder.encode(senha != null ? senha : UUID.randomUUID().toString()));
         entity.setStatus(UserStatus.NOT_CONFIRMED);
         return entity;
+    }
+
+    /**
+     * Formato básico usuario@dominio.ext, sem regex (evita backtracking, java:S5852):
+     * um único "@", sem espaços, e domínio com "." que não está na ponta.
+     */
+    static boolean emailValido(String email) {
+        if (email == null || email.chars().anyMatch(Character::isWhitespace)) {
+            return false;
+        }
+        int arroba = email.indexOf('@');
+        if (arroba <= 0 || arroba != email.lastIndexOf('@')) {
+            return false;
+        }
+        String dominio = email.substring(arroba + 1);
+        int ponto = dominio.lastIndexOf('.');
+        return ponto > 0 && ponto < dominio.length() - 1;
     }
 
     private static UserRole perfil(String valor) {

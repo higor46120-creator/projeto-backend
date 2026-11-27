@@ -1,5 +1,6 @@
 package br.edu.fiec.helptec.features.salas.controller;
 
+import lombok.RequiredArgsConstructor;
 import br.edu.fiec.helptec.features.commons.PageRequestDTO;
 import br.edu.fiec.helptec.features.commons.PageResponseDTO;
 import br.edu.fiec.helptec.features.salas.model.dto.SalasDTO;
@@ -7,17 +8,16 @@ import br.edu.fiec.helptec.features.salas.model.dto.SalasFilterDTO;
 import br.edu.fiec.helptec.features.salas.service.SalasService;
 import org.springframework.ai.mcp.annotation.McpTool;
 import org.springframework.ai.mcp.annotation.McpToolParam;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
 /** Salas (também expostas como ferramentas MCP para agentes de IA). */
 @RestController
 @RequestMapping("/api/salas")
+@RequiredArgsConstructor
 public class SalasController {
 
-    @Autowired
-    private SalasService salasService;
+    private final SalasService salasService;
 
     @McpTool(name = "buscar_salas",
             description = "Lista as salas/laboratórios cadastrados, com filtro opcional por nome ou termo e paginação. "

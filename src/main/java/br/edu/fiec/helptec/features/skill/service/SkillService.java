@@ -1,5 +1,6 @@
 package br.edu.fiec.helptec.features.skill.service;
 
+import lombok.RequiredArgsConstructor;
 import br.edu.fiec.helptec.features.skill.Skill;
 import br.edu.fiec.helptec.features.skill.UsuarioSkill;
 import br.edu.fiec.helptec.features.skill.model.dto.SkillDTO;
@@ -9,23 +10,20 @@ import br.edu.fiec.helptec.features.usuario.model.dto.UsuarioResponseDTO;
 import br.edu.fiec.helptec.features.usuario.model.entity.UserRole;
 import br.edu.fiec.helptec.features.usuario.model.entity.UsuarioEntity;
 import br.edu.fiec.helptec.features.usuario.repository.UsuarioRepository;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.UUID;
 
 @Service
+@RequiredArgsConstructor
 public class SkillService {
 
-    @Autowired
-    private SkillRepository skillRepository;
+    private final SkillRepository skillRepository;
 
-    @Autowired
-    private UsuarioSkillRepository usuarioSkillRepository;
+    private final UsuarioSkillRepository usuarioSkillRepository;
 
-    @Autowired
-    private UsuarioRepository usuarioRepository;
+    private final UsuarioRepository usuarioRepository;
 
     // ---- Catálogo de skills ----
 

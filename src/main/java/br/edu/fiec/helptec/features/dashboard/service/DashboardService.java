@@ -1,5 +1,6 @@
 package br.edu.fiec.helptec.features.dashboard.service;
 
+import lombok.RequiredArgsConstructor;
 import br.edu.fiec.helptec.features.chamado.Chamado;
 import br.edu.fiec.helptec.features.chamado.StatusChamado;
 import br.edu.fiec.helptec.features.chamado.repository.ChamadoRepository;
@@ -9,7 +10,6 @@ import br.edu.fiec.helptec.features.dashboard.model.dto.ResumoAprovadorDTO;
 import br.edu.fiec.helptec.features.dashboard.model.dto.WeeklyTrendDayDTO;
 import br.edu.fiec.helptec.features.usuario.model.entity.UsuarioEntity;
 import br.edu.fiec.helptec.features.usuario.repository.UsuarioRepository;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.time.DayOfWeek;
@@ -23,13 +23,12 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
+@RequiredArgsConstructor
 public class DashboardService {
 
-    @Autowired
-    private ChamadoRepository chamadoRepository;
+    private final ChamadoRepository chamadoRepository;
 
-    @Autowired
-    private UsuarioRepository usuarioRepository;
+    private final UsuarioRepository usuarioRepository;
 
     // Rótulos em inglês retornados nas chaves dos mapas (statusDistribution / ticketsByPriority)
     private static final String[] PRIORITY_LABELS = {"Low", "Medium", "High", "Critical"};

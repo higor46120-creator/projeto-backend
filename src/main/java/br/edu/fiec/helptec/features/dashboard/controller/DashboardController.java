@@ -1,12 +1,12 @@
 package br.edu.fiec.helptec.features.dashboard.controller;
 
+import lombok.RequiredArgsConstructor;
 import br.edu.fiec.helptec.features.dashboard.model.dto.ChamadoResumoAprovadorDTO;
 import br.edu.fiec.helptec.features.dashboard.model.dto.ManagerDashboardDTO;
 import br.edu.fiec.helptec.features.dashboard.model.dto.ResumoAprovadorDTO;
 import br.edu.fiec.helptec.features.dashboard.service.DashboardService;
 import org.springframework.ai.mcp.annotation.McpTool;
 import org.springframework.ai.mcp.annotation.McpToolParam;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -18,10 +18,10 @@ import java.util.List;
 /** Indicadores dos painéis (também expostos como ferramentas MCP para agentes de IA). */
 @RestController
 @RequestMapping("/api/dashboard")
+@RequiredArgsConstructor
 public class DashboardController {
 
-    @Autowired
-    private DashboardService dashboardService;
+    private final DashboardService dashboardService;
 
     @McpTool(name = "dashboard_gerente",
             description = "Indicadores do painel do gerente (totais por status, prioridade, etc.). Somente GERENTE.",

@@ -52,7 +52,6 @@ public class UsuarioEntity implements UserDetails {
         this.password = password;
         this.fcmToken = fcmToken;
         this.role = role;
-        this.area = area;
     }
 
     public UsuarioEntity(String nome, String email, String password, String fcmToken, UserRole role, String area) {
