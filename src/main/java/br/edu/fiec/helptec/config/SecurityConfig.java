@@ -5,14 +5,22 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.LoginUrlAuthenticationEntryPoint;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher;
+import org.springframework.security.web.util.matcher.MediaTypeRequestMatcher;
+import org.springframework.security.web.util.matcher.OrRequestMatcher;
+import org.springframework.security.web.util.matcher.RequestHeaderRequestMatcher;
+import org.springframework.security.web.util.matcher.RequestMatcher;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -20,6 +28,7 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.Set;
 
 @Configuration
 @EnableWebSecurity
@@ -93,14 +102,15 @@ public class SecurityConfig {
                         .anyRequest().authenticated()
                 )
 
-                // Trata exceções de não autorizado para retornar HTTP 401 em JSON em vez de redirecionar para HTML do Google
+                // Quem não está autenticado recebe uma resposta diferente conforme o cliente:
+                //  1) API, mobile, front (fetch com token) e MCP -> 401 com WWW-Authenticate: Bearer
+                //  2) Navegador abrindo uma página do backend (ex.: localhost:8080) -> login do Google
+                // A primeira regra também é a padrão: o que não casar com nenhuma recebe 401.
                 .exceptionHandling(exception -> exception
-                        // O cabeçalho WWW-Authenticate indica aos clientes (inclusive os MCP)
-                        // que o acesso é por token Bearer (JWT)
-                        .authenticationEntryPoint((request, response, authException) -> {
-                            response.setHeader(HttpHeaders.WWW_AUTHENTICATE, "Bearer realm=\"helptec\"");
-                            response.setStatus(HttpStatus.UNAUTHORIZED.value());
-                        })
+                        .defaultAuthenticationEntryPointFor(bearerEntryPoint(), requisicaoDeApi())
+                        .defaultAuthenticationEntryPointFor(
+                                new LoginUrlAuthenticationEntryPoint("/oauth2/authorization/google"),
+                                requisicaoDeNavegador())
                 )
 
                 .authenticationProvider(authenticationProvider)
@@ -109,8 +119,8 @@ public class SecurityConfig {
                 // -> Google -> /login/oauth2/code/google -> OAuth2SuccessHandler gera o JWT
                 // e redireciona para app.oauth2.redirect-uri?token=...
                 // O mobile continua usando POST /api/v1/auth/google com o ID token.
-                // Como o authenticationEntryPoint acima é explícito, a API continua respondendo
-                // 401 em JSON (e não redireciona para a página do Google).
+                // As regras de exceptionHandling acima garantem que a API e o mobile recebam 401
+                // (e não um redirecionamento para a página do Google).
                 .oauth2Login(oauth2 -> oauth2
                         .successHandler(oAuth2SuccessHandler)
                         // Em caso de falha, devolve para o front com ?error=... (em vez de /login?error,
@@ -125,6 +135,40 @@ public class SecurityConfig {
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
+    }
+
+    /** 401 + WWW-Authenticate: Bearer (o cabeçalho orienta clientes de API e MCP a mandar o JWT). */
+    private static AuthenticationEntryPoint bearerEntryPoint() {
+        return (request, response, authException) -> {
+            response.setHeader(HttpHeaders.WWW_AUTHENTICATE, "Bearer realm=\"helptec\"");
+            response.setStatus(HttpStatus.UNAUTHORIZED.value());
+        };
+    }
+
+    /**
+     * Chamadas de API: rotas da API (inclusive /usuarios, /notifications e /mcp, que não ficam
+     * em /api), qualquer requisição com cabeçalho Authorization (mobile e front com token)
+     * ou que peça JSON.
+     */
+    private static RequestMatcher requisicaoDeApi() {
+        var path = PathPatternRequestMatcher.withDefaults();
+        var pedeJson = new MediaTypeRequestMatcher(MediaType.APPLICATION_JSON);
+        pedeJson.setIgnoredMediaTypes(Set.of(MediaType.ALL));
+        return new OrRequestMatcher(
+                path.matcher("/api/**"),
+                path.matcher("/usuarios/**"),
+                path.matcher("/notifications/**"),
+                path.matcher("/mcp/**"),
+                new RequestHeaderRequestMatcher(HttpHeaders.AUTHORIZATION),
+                pedeJson
+        );
+    }
+
+    /** Navegador abrindo uma página: o cabeçalho Accept pede text/html. */
+    private static RequestMatcher requisicaoDeNavegador() {
+        var pedeHtml = new MediaTypeRequestMatcher(MediaType.TEXT_HTML);
+        pedeHtml.setIgnoredMediaTypes(Set.of(MediaType.ALL));
+        return pedeHtml;
     }
 
     // Endereços do front que podem chamar a API, separados por vírgula
